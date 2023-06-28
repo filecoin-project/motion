@@ -1,0 +1,154 @@
+openapi: 3.0.3
+info:
+  title: Motion Data Storage and Retrieval API
+  description: This is the API for exchanging data with FileCoin network via Motion.
+  version: 0.0.0
+servers:
+  - url: 'http://localhost:40080'
+paths:
+  /v0/data/:
+    post:
+      summary: 'Uploads data to the server.'
+      description: 'This endpoint allows data to be uploaded to the server.'
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        '201':
+          description: 'Data successfully created.'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    description: 'Unique, opaque identifier for the created data.'
+              examples:
+                default:
+                  value:
+                    id: 'unique-data-id'
+        '500':
+          description: 'An internal server error occurred.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/error'
+        '503':
+          description: 'Service temporarily unavailable. Please try again later.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/error'
+  /v0/data/{id}:
+    get:
+      summary: 'Retrieves data by ID.'
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Data successfully retrieved.'
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: 'No data found for the given ID.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/error'
+        '500':
+          description: 'An internal server error occurred.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/error'
+        '503':
+          description: 'Service temporarily unavailable. Please try again later.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/error'
+  /v0/data/{id}/status:
+    get:
+      summary: 'Gets the status of data for a given ID.'
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Data status successfully retrieved.'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    description: 'ID associated with the data.'
+                  replicas:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        provider:
+                          type: string
+                          description: 'ID of the FileCoin storage provider.'
+                        status:
+                          type: string
+                          description: 'Status of this replica. Can be "active", "slashed" or "expired".'
+                        lastVerified:
+                          type: string
+                          format: date-time
+                          description: 'Last verification time of the replica. Follows the RFC 3339 format.'
+                        expiration:
+                          type: string
+                          format: date-time
+                          description: 'Expiration time of the data storage. Follows the RFC 3339 format.'
+              examples:
+                default:
+                  value:
+                    id: 'unique-data-id'
+                    replicas:
+                      - provider: 'f0xxxx'
+                        status: 'active'
+                        lastVerified: '2023-05-29T00:00:00Z'
+                        expiration: '2023-06-29T00:00:00Z'
+        '404':
+          description: 'No status found for the given ID.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/error'
+        '500':
+          description: 'An internal server error occurred.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/error'
+        '503':
+          description: 'Service temporarily unavailable. Please try again later.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/error'
+components:
+  schemas:
+    error:
+      type: object
+      properties:
+        error:
+          type: string
