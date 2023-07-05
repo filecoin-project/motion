@@ -6,10 +6,10 @@ info:
 servers:
   - url: 'http://localhost:40080'
 paths:
-  /v0/data/:
+  /v0/blob:
     post:
       summary: 'Uploads data to the server.'
-      description: 'This endpoint allows data to be uploaded to the server.'
+      description: 'This endpoint allows data blob to be uploaded to the server.'
       requestBody:
         required: true
         content:
@@ -27,11 +27,11 @@ paths:
                 properties:
                   id:
                     type: string
-                    description: 'Unique, opaque identifier for the created data.'
+                    description: 'Unique, opaque identifier for the created data blob.'
               examples:
                 default:
                   value:
-                    id: 'unique-data-id'
+                    id: 'unique-blob-id'
         '500':
           description: 'An internal server error occurred.'
           content:
@@ -44,9 +44,9 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/error'
-  /v0/data/{id}:
+  /v0/blob/{id}:
     get:
-      summary: 'Retrieves data by ID.'
+      summary: 'Retrieves blob by ID.'
       parameters:
         - name: id
           in: path
@@ -62,7 +62,7 @@ paths:
                 type: string
                 format: binary
         '404':
-          description: 'No data found for the given ID.'
+          description: 'No blob found for the given ID.'
           content:
             application/json:
               schema:
@@ -79,9 +79,9 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/error'
-  /v0/data/{id}/status:
+  /v0/blob/{id}/status:
     get:
-      summary: 'Gets the status of data for a given ID.'
+      summary: 'Gets the status of blob for a given ID.'
       parameters:
         - name: id
           in: path
@@ -98,7 +98,7 @@ paths:
                 properties:
                   id:
                     type: string
-                    description: 'ID associated with the data.'
+                    description: 'ID associated with the blob.'
                   replicas:
                     type: array
                     items:
@@ -117,11 +117,11 @@ paths:
                         expiration:
                           type: string
                           format: date-time
-                          description: 'Expiration time of the data storage. Follows the RFC 3339 format.'
+                          description: 'Expiration time of the blob storage. Follows the RFC 3339 format.'
               examples:
                 default:
                   value:
-                    id: 'unique-data-id'
+                    id: 'unique-blob-id'
                     replicas:
                       - provider: 'f0xxxx'
                         status: 'active'
