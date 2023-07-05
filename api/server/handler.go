@@ -1,0 +1,132 @@
+package server
+
+import (
+	"fmt"
+	"io"
+	"net/http"
+	"strconv"
+	"strings"
+
+	"github.com/filecoin-project/motion/api"
+	"github.com/filecoin-project/motion/blob"
+)
+
+func (m *HttpServer) handleBlobRoot(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodOptions:
+		w.Header().Set(httpHeaderAllow(http.MethodPost, http.MethodOptions))
+	case http.MethodPost:
+		m.handlePostBlob(w, r)
+	default:
+		respondWithNotAllowed(w, http.MethodPost, http.MethodOptions)
+	}
+}
+
+func (m *HttpServer) handlePostBlob(w http.ResponseWriter, r *http.Request) {
+	// TODO: check Accept header accepts JSON response
+	if r.Header.Get("Content-Type") != "application/octet-stream" {
+		respondWithJson(w, errResponseNotStreamContentType, http.StatusBadRequest)
+		return
+	}
+	var contentLength uint64
+	if value := r.Header.Get("Content-Length"); value != "" {
+		var err error
+		if contentLength, err = strconv.ParseUint(value, 10, 32); err != nil {
+			respondWithJson(w, errResponseInvalidContentLength, http.StatusBadRequest)
+			return
+		}
+		if contentLength > m.maxBlobLength {
+			respondWithJson(w, errResponseContentLengthTooLarge(m.maxBlobLength), http.StatusBadRequest)
+			return
+		}
+	}
+	defer r.Body.Close()
+	desc, err := m.store.Put(r.Context(), r.Body)
+	switch err {
+	case nil:
+	case blob.ErrBlobTooLarge:
+		respondWithJson(w, errResponseMaxBlobLengthExceeded(m.maxBlobLength), http.StatusBadRequest)
+		return
+	default:
+		respondWithJson(w, errResponseInternalError(err), http.StatusInternalServerError)
+		return
+	}
+	logger := logger.With("id", desc.ID, "size", desc.Size)
+	if contentLength != 0 && desc.Size != contentLength {
+		logger.Warnw("Content-Length in request header did not match the data length", "expectedSize", contentLength)
+		// TODO: add option to reject such requests?
+	}
+	respondWithJson(w, api.PostBlobResponse{ID: desc.ID.String()}, http.StatusCreated)
+	logger.Debugw("Blob crated successfully", "id", desc.ID, "size", desc.Size)
+}
+
+func (m *HttpServer) handleBlobSubtree(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodOptions:
+		w.Header().Set(httpHeaderAllow(http.MethodGet, http.MethodOptions))
+	case http.MethodGet:
+		m.handleBlobGet(w, r)
+	default:
+		respondWithNotAllowed(w, http.MethodPost, http.MethodOptions)
+	}
+}
+
+func (m *HttpServer) handleBlobGet(w http.ResponseWriter, r *http.Request) {
+	suffix := strings.TrimPrefix(r.URL.Path, "/v0/blob/")
+	segments := strings.Split(suffix, "/")
+	switch len(segments) {
+	case 1:
+		m.handleBlobGetByID(w, r, segments[0])
+	case 2:
+		if segments[1] == "status" {
+			m.handleBlobGetStatusByID(w, r, segments[0])
+		} else {
+			respondWithJson(w, errResponsePageNotFound, http.StatusNotFound)
+		}
+	default:
+		respondWithJson(w, errResponsePageNotFound, http.StatusNotFound)
+	}
+}
+
+func (m *HttpServer) handleBlobGetByID(w http.ResponseWriter, r *http.Request, idUriSegment string) {
+	var id blob.ID
+	if err := id.Decode(idUriSegment); err != nil {
+		respondWithJson(w, errResponseInvalidBlobID, http.StatusBadRequest)
+		return
+	}
+	logger := logger.With("id", id)
+	blobReader, err := m.store.Get(r.Context(), id)
+	switch err {
+	case nil:
+	case blob.ErrBlobNotFound:
+		respondWithJson(w, errResponseBlobNotFound, http.StatusNotFound)
+		return
+	default:
+		respondWithJson(w, errResponseInternalError(err), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set(httpHeaderContentTypeOctetStream())
+	w.Header().Set(httpHeaderContentTypeOptionsNoSniff())
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachement; filename="%s.bin"`, id.String()))
+
+	// TODO: Use pooled buffers with configurable size for better efficiency
+	var buf []byte
+	if written, err := io.CopyBuffer(w, blobReader, buf); err != nil {
+		logger.Errorw("Failed to write blob", "written", written, "err", err)
+	} else {
+		logger.Debugw("Blob fetched successfully", "size", written)
+	}
+}
+
+func (m *HttpServer) handleBlobGetStatusByID(w http.ResponseWriter, _ *http.Request, _ string) {
+	respondWithJson(w, errResponseNotImplemented, http.StatusNotImplemented)
+}
+
+func (m *HttpServer) handleRoot(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodOptions:
+		w.Header().Set(httpHeaderAllow(http.MethodOptions))
+	default:
+		respondWithJson(w, errResponsePageNotFound, http.StatusNotFound)
+	}
+}
