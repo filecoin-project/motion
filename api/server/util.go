@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/filecoin-project/motion/api"
@@ -17,6 +18,10 @@ func httpHeaderContentTypeOctetStream() (string, string) {
 
 func httpHeaderContentTypeOptionsNoSniff() (string, string) {
 	return "X-Content-Type-Options", "nosniff"
+}
+
+func httpHeaderContentLength(length uint64) (string, string) {
+	return "Content-Length", strconv.FormatUint(length, 10)
 }
 
 func httpHeaderAllow(methods ...string) (string, string) {

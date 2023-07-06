@@ -13,7 +13,9 @@ var logger = log.Logger("motion/cmd")
 
 func main() {
 	// TODO: add flags, options and all that jazz
-	_ = log.SetLogLevel("*", "INFO")
+	if _, set := os.LookupEnv("GOLOG_LOG_LEVEL"); !set {
+		_ = log.SetLogLevel("*", "INFO")
+	}
 	m, err := motion.New()
 	if err != nil {
 		logger.Fatalw("Failed to instantiate Motion", "err", err)
