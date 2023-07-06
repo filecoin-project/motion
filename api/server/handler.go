@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/filecoin-project/motion/api"
 	"github.com/filecoin-project/motion/blob"
@@ -95,7 +94,7 @@ func (m *HttpServer) handleBlobGetByID(w http.ResponseWriter, r *http.Request, i
 		return
 	}
 	logger := logger.With("id", id)
-	blobReader, err := m.store.Get(r.Context(), id)
+	blobReader, blobDesc, err := m.store.Get(r.Context(), id)
 	switch err {
 	case nil:
 	case blob.ErrBlobNotFound:
@@ -108,10 +107,9 @@ func (m *HttpServer) handleBlobGetByID(w http.ResponseWriter, r *http.Request, i
 	defer blobReader.Close()
 	w.Header().Set(httpHeaderContentTypeOctetStream())
 	w.Header().Set(httpHeaderContentTypeOptionsNoSniff())
+	w.Header().Set(httpHeaderContentLength(blobDesc.Size))
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachement; filename="%s.bin"`, id.String()))
-	// TODO: Discuss supporting blob creation time, which can then be passed as last modified time
-	//       below instead of zero-time. This has added benefit of handling specific HTTP range request.
-	http.ServeContent(w, r, "", time.Time{}, blobReader)
+	http.ServeContent(w, r, "", blobDesc.ModificationTime, blobReader)
 	logger.Debug("Blob fetched successfully")
 }
 

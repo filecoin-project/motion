@@ -9,7 +9,13 @@ To run the server locally, execute:
 go run ./cmd/motion
 ```
 
-The above command starts the Motion HTTP API exposed on default listen address: http://localhost:40080
+Alternatively, run the latest motion as a container by executing:
+
+```shell
+docker run --rm ghcr.io/filecoin-project/motion:main
+```
+
+The above starts the Motion HTTP API exposed on default listen address: http://localhost:40080
 
 For more information, see the [Motion OpenAPI specification](openapi.yaml).
 

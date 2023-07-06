@@ -12,14 +12,15 @@ import (
 
 var logger = log.Logger("motion/api/server")
 
-type (
-	HttpServer struct {
-		*options
-		httpServer *http.Server
-		store      blob.Store
-	}
-)
+// HttpServer is Motion API the HTTP server.
+type HttpServer struct {
+	*options
+	httpServer *http.Server
+	store      blob.Store
+}
 
+// NewHttpServer instantiates a new HTTP server that stores and retrieves blobs via the given store.
+// See Option.
 func NewHttpServer(store blob.Store, o ...Option) (*HttpServer, error) {
 	opts, err := newOptions(o...)
 	if err != nil {
@@ -35,6 +36,8 @@ func NewHttpServer(store blob.Store, o ...Option) (*HttpServer, error) {
 	return server, nil
 }
 
+// Start Starts the HTTP server.
+// See Shutdown.
 func (m *HttpServer) Start(_ context.Context) error {
 	listener, err := net.Listen("tcp", m.httpListenAddr)
 	if err != nil {
@@ -51,6 +54,7 @@ func (m *HttpServer) Start(_ context.Context) error {
 	return nil
 }
 
+// ServeMux returns a new HTTP handler for the endpoints supported by the server.
 func (m *HttpServer) ServeMux() *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v0/blob", m.handleBlobRoot)
@@ -59,6 +63,7 @@ func (m *HttpServer) ServeMux() *http.ServeMux {
 	return mux
 }
 
+// Shutdown shuts down the HTTP Server.
 func (m *HttpServer) Shutdown(ctx context.Context) error {
 	return m.httpServer.Shutdown(ctx)
 }
