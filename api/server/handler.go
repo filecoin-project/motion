@@ -2,10 +2,10 @@ package server
 
 import (
 	"fmt"
-	"io"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/filecoin-project/motion/api"
 	"github.com/filecoin-project/motion/blob"
@@ -105,17 +105,14 @@ func (m *HttpServer) handleBlobGetByID(w http.ResponseWriter, r *http.Request, i
 		respondWithJson(w, errResponseInternalError(err), http.StatusInternalServerError)
 		return
 	}
+	defer blobReader.Close()
 	w.Header().Set(httpHeaderContentTypeOctetStream())
 	w.Header().Set(httpHeaderContentTypeOptionsNoSniff())
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachement; filename="%s.bin"`, id.String()))
-
-	// TODO: Use pooled buffers with configurable size for better efficiency
-	var buf []byte
-	if written, err := io.CopyBuffer(w, blobReader, buf); err != nil {
-		logger.Errorw("Failed to write blob", "written", written, "err", err)
-	} else {
-		logger.Debugw("Blob fetched successfully", "size", written)
-	}
+	// TODO: Discuss supporting blob creation time, which can then be passed as last modified time
+	//       below instead of zero-time. This has added benefit of handling specific HTTP range request.
+	http.ServeContent(w, r, "", time.Time{}, blobReader)
+	logger.Debug("Blob fetched successfully")
 }
 
 func (m *HttpServer) handleBlobGetStatusByID(w http.ResponseWriter, _ *http.Request, _ string) {

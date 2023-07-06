@@ -21,7 +21,7 @@ type (
 	}
 	Store interface {
 		Put(context.Context, io.ReadCloser) (*Descriptor, error)
-		Get(context.Context, ID) (io.ReadCloser, error)
+		Get(context.Context, ID) (io.ReadSeekCloser, error)
 	}
 )
 

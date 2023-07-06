@@ -53,7 +53,7 @@ func (l *LocalStore) Put(_ context.Context, reader io.ReadCloser) (*Descriptor, 
 	}, nil
 }
 
-func (l *LocalStore) Get(_ context.Context, id ID) (io.ReadCloser, error) {
+func (l *LocalStore) Get(_ context.Context, id ID) (io.ReadSeekCloser, error) {
 	switch blob, err := os.Open(path.Join(l.dir, id.String()+".bin")); {
 	case err == nil:
 		return blob, nil
