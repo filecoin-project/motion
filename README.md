@@ -2,6 +2,24 @@
 
 Motion is a service to propel data onto FileCoin network via a simple easy to use API. It aims to create an easy path for independent software vendors to integrate FileCoin as a storage layer.
 
+## Usage
+
+```text
+$ motion --help
+NAME:
+   motion - Propelling data onto FileCoin
+
+USAGE:
+   motion [global options] command [command options] [arguments...]
+
+COMMANDS:
+   help, h  Shows a list of commands or help for one command
+
+GLOBAL OPTIONS:
+   --storeDir value  The path at which to store Motion data (default: OS Temporary directory) [$MOTION_STORE_DIR]
+   --help, -h        show help
+```
+
 ## Run Server Locally
 
 ### Prerequisites
@@ -17,7 +35,7 @@ To start the motion API server run:
 docker run --rm -p 40080:40080 ghcr.io/filecoin-project/motion:main
 ```
 The above starts the Motion HTTP API exposed on default listen address: http://localhost:40080.
-It uses a temporary directory to store blobls in a flat file format.
+It uses a temporary directory to store blobs in a flat file format.
 
 ### Store blobs
 
@@ -45,6 +63,17 @@ fish
 ```
 
 Alternatively, you can browse the same URL in a web browser, which should prompt you to download the binary file.
+
+### Configure local store directory
+
+To configure the local storage directory, set `--storeDir` flag as an argument to the container.
+This will override the directy path used by Motion to store files locally.
+The path can be a [mounted volume](https://docs.docker.com/storage/volumes/), which then allows you to retain the stored files after the container
+is restarted and restore them back. For example, the following command uses a directory named `store` in the current working directory mounted as a volume on Motion container at path `/store`:
+
+```shell
+docker run --rm -p 40080:40080 -v $PWD/store:/store ghcr.io/filecoin-project/motion:main --storeDir=/store
+```
 
 ### Check the status of an uploaded blob
 

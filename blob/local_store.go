@@ -34,7 +34,7 @@ func (l *LocalStore) Put(_ context.Context, reader io.ReadCloser) (*Descriptor, 
 	if err != nil {
 		return nil, err
 	}
-	dest, err := os.CreateTemp("", "motion_local_store_*.bin")
+	dest, err := os.CreateTemp(l.dir, "motion_local_store_*.bin.temp")
 	if err != nil {
 		return nil, err
 	}
