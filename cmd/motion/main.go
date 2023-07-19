@@ -27,13 +27,32 @@ func main() {
 				Value:       os.TempDir(),
 				EnvVars:     []string{"MOTION_STORE_DIR"},
 			},
+			&cli.BoolFlag{
+				Name:        "experimentalRibsStore",
+				Usage:       "Whether to use experimental RIBS as the storage and deal making",
+				DefaultText: "Local storage is used",
+			},
 		},
 		Action: func(cctx *cli.Context) error {
 			storeDir := cctx.String("storeDir")
-			logger.Infow("Using local blob store", "storeDir", storeDir)
-			m, err := motion.New(
-				motion.WithBlobStore(blob.NewLocalStore(storeDir)),
-			)
+			var store blob.Store
+			if cctx.Bool("experimentalRibsStore") {
+				rbstore, err := blob.NewRibsStore(storeDir)
+				if err != nil {
+					return err
+				}
+				logger.Infow("Using RIBS blob store", "storeDir", storeDir)
+				if err := rbstore.Start(cctx.Context); err != nil {
+					logger.Errorw("Failed to start RIBS blob store", "err", err)
+					return err
+				}
+				store = rbstore
+			} else {
+				store = blob.NewLocalStore(storeDir)
+				logger.Infow("Using local blob store", "storeDir", storeDir)
+			}
+
+			m, err := motion.New(motion.WithBlobStore(store))
 			if err != nil {
 				logger.Fatalw("Failed to instantiate Motion", "err", err)
 			}
@@ -48,8 +67,13 @@ func main() {
 			logger.Info("Terminating...")
 			if err := m.Shutdown(ctx); err != nil {
 				logger.Warnw("Failure occurred while shutting down Motion.", "err", err)
-				return err
 			}
+			// TODO: Re-enable once the panic is fixed. See: https://github.com/FILCAT/ribs/issues/39
+			//if rbstore, ok := store.(*blob.RibsStore); ok {
+			//	if err := rbstore.Shutdown(ctx); err != nil {
+			//		logger.Warnw("Failure occurred while shutting down RIBS blob store.", "err", err)
+			//	}
+			//}
 			logger.Info("Shut down Motion successfully.")
 			return nil
 		},
