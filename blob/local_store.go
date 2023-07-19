@@ -30,6 +30,7 @@ func NewLocalStore(dir string) *LocalStore {
 // The Descriptor.ModificationTime is set to the modification date of the file that corresponds to the content.
 // The Descriptor.ID is randomly generated; see NewID.
 func (l *LocalStore) Put(_ context.Context, reader io.ReadCloser) (*Descriptor, error) {
+	// TODO: add size limiter here and return ErrBlobTooLarge.
 	id, err := NewID()
 	if err != nil {
 		return nil, err
