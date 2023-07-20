@@ -32,9 +32,8 @@ type (
 	// RibsStore is an experimental Store implementation that uses RIBS.
 	// See: https://github.com/filcat/ribs
 	RibsStore struct {
-		ribs    ribs.RIBS
-		maxSize int
-		//index   map[uuid.UUID]*ribsStoredBlob // TODO persist this on disk
+		ribs     ribs.RIBS
+		maxSize  int
 		indexDir string
 	}
 	ribsStoredBlob struct {
@@ -71,9 +70,8 @@ func NewRibsStore(dir string) (*RibsStore, error) {
 		return nil, err
 	}
 	return &RibsStore{
-		ribs:    rbs,
-		maxSize: 32 << 30, // 32 GiB
-		//index:   map[uuid.UUID]*ribsStoredBlob{},
+		ribs:     rbs,
+		maxSize:  32 << 30, // 32 GiB
 		indexDir: indexDir,
 	}, nil
 
@@ -151,24 +149,39 @@ SplitLoop:
 	return storedBlob.Descriptor, nil
 }
 
-func (r *RibsStore) Get(ctx context.Context, id ID) (io.ReadSeekCloser, *Descriptor, error) {
-	index, err := os.Open(path.Join(r.indexDir, id.String()))
+func (r *RibsStore) Get(ctx context.Context, id ID) (io.ReadSeekCloser, error) {
+	storedBlob, err := r.describeRibsStoredBlob(ctx, id)
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return nil, nil, ErrBlobNotFound
-		}
-		return nil, nil, err
-	}
-	var storedBlob ribsStoredBlob
-	if err := json.NewDecoder(index).Decode(&storedBlob); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	session := r.ribs.Session(ctx)
-	reader, err := newRibsStoredBlobReader(session, &storedBlob)
+	reader, err := newRibsStoredBlobReader(session, storedBlob)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	return reader, storedBlob.Descriptor, nil
+	return reader, nil
+}
+
+func (r *RibsStore) Describe(ctx context.Context, id ID) (*Descriptor, error) {
+	storedBlob, err := r.describeRibsStoredBlob(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return storedBlob.Descriptor, err
+}
+
+func (r *RibsStore) describeRibsStoredBlob(_ context.Context, id ID) (*ribsStoredBlob, error) {
+	switch index, err := os.Open(path.Join(r.indexDir, id.String())); {
+	case err == nil:
+		var storedBlob ribsStoredBlob
+		err := json.NewDecoder(index).Decode(&storedBlob)
+		// TODO: populate descriptor status with FileCoin chain data about the stored blob.
+		return &storedBlob, err
+	case errors.Is(err, os.ErrNotExist):
+		return nil, ErrBlobNotFound
+	default:
+		return nil, err
+	}
 }
 
 func (r *RibsStore) Shutdown(_ context.Context) error {

@@ -94,7 +94,17 @@ func (m *HttpServer) handleBlobGetByID(w http.ResponseWriter, r *http.Request, i
 		return
 	}
 	logger := logger.With("id", id)
-	blobReader, blobDesc, err := m.store.Get(r.Context(), id)
+	blobDesc, err := m.store.Describe(r.Context(), id)
+	switch err {
+	case nil:
+	case blob.ErrBlobNotFound:
+		respondWithJson(w, errResponseBlobNotFound, http.StatusNotFound)
+		return
+	default:
+		respondWithJson(w, errResponseInternalError(err), http.StatusInternalServerError)
+		return
+	}
+	blobReader, err := m.store.Get(r.Context(), id)
 	switch err {
 	case nil:
 	case blob.ErrBlobNotFound:
@@ -113,8 +123,41 @@ func (m *HttpServer) handleBlobGetByID(w http.ResponseWriter, r *http.Request, i
 	logger.Debug("Blob fetched successfully")
 }
 
-func (m *HttpServer) handleBlobGetStatusByID(w http.ResponseWriter, _ *http.Request, _ string) {
-	respondWithJson(w, errResponseNotImplemented, http.StatusNotImplemented)
+func (m *HttpServer) handleBlobGetStatusByID(w http.ResponseWriter, r *http.Request, idUriSegment string) {
+	var id blob.ID
+	if err := id.Decode(idUriSegment); err != nil {
+		respondWithJson(w, errResponseInvalidBlobID, http.StatusBadRequest)
+		return
+	}
+	logger := logger.With("id", id)
+	blobDesc, err := m.store.Describe(r.Context(), id)
+	switch err {
+	case nil:
+	case blob.ErrBlobNotFound:
+		respondWithJson(w, errResponseBlobNotFound, http.StatusNotFound)
+		return
+	default:
+		logger.Errorw("Failed to get status for ID", "err", err)
+		respondWithJson(w, errResponseInternalError(err), http.StatusInternalServerError)
+		return
+	}
+
+	response := api.GetStatusResponse{
+		ID: idUriSegment,
+	}
+
+	if blobDesc.Status != nil {
+		response.Replicas = make([]api.Replica, len(blobDesc.Status.Replicas))
+		for _, replica := range blobDesc.Status.Replicas {
+			response.Replicas = append(response.Replicas, api.Replica{
+				Provider:     replica.Provider,
+				Status:       replica.Status,
+				LastVerified: replica.LastVerified,
+				Expiration:   replica.Expiration,
+			})
+		}
+	}
+	respondWithJson(w, response, http.StatusOK)
 }
 
 func (m *HttpServer) handleRoot(w http.ResponseWriter, r *http.Request) {

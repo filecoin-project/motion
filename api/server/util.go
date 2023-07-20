@@ -31,7 +31,9 @@ func httpHeaderAllow(methods ...string) (string, string) {
 func respondWithJson(w http.ResponseWriter, resp any, code int) {
 	w.Header().Set(httpHeaderContentTypeJson())
 	w.Header().Set(httpHeaderContentTypeOptionsNoSniff())
-	w.WriteHeader(code)
+	if code != http.StatusOK {
+		w.WriteHeader(code)
+	}
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		logger.Errorw("Failed to encode response.", "code", code, "resp", resp, "err", err)
 	}
