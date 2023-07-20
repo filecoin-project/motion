@@ -12,7 +12,6 @@ var (
 	errResponseBlobNotFound         = api.ErrorResponse{Error: "No blob is found for the given ID"}
 	errResponseNotStreamContentType = api.ErrorResponse{Error: `Invalid content type, expected "application/octet-stream".`}
 	errResponseInvalidContentLength = api.ErrorResponse{Error: "Invalid content length, expected unsigned numerical value."}
-	errResponseNotImplemented       = api.ErrorResponse{Error: "This functionally is pending implementation."}
 )
 
 func errResponseInternalError(err error) api.ErrorResponse {

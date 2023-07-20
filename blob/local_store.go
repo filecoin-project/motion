@@ -59,23 +59,32 @@ func (l *LocalStore) Put(_ context.Context, reader io.ReadCloser) (*Descriptor, 
 	}, nil
 }
 
-// Get Retrieves the content of blob log with its Descriptor.
-// If no file is found for the given id, ErrBlobNotFound is returned.
-func (l *LocalStore) Get(_ context.Context, id ID) (io.ReadSeekCloser, *Descriptor, error) {
+// Get Retrieves the content of blob.
+// If no blob is found for the given id, ErrBlobNotFound is returned.
+func (l *LocalStore) Get(_ context.Context, id ID) (io.ReadSeekCloser, error) {
 	switch blob, err := os.Open(path.Join(l.dir, id.String()+".bin")); {
 	case err == nil:
-		stat, err := blob.Stat()
-		if err != nil {
-			return nil, nil, err
-		}
-		return blob, &Descriptor{
+		return blob, nil
+	case errors.Is(err, os.ErrNotExist):
+		return nil, ErrBlobNotFound
+	default:
+		return nil, err
+	}
+}
+
+// Describe gets the description of the blob for the given id.
+// If no blob is found for the given id, ErrBlobNotFound is returned.
+func (l *LocalStore) Describe(ctx context.Context, id ID) (*Descriptor, error) {
+	switch stat, err := os.Stat(path.Join(l.dir, id.String()+".bin")); {
+	case err == nil:
+		return &Descriptor{
 			ID:               id,
 			Size:             uint64(stat.Size()),
 			ModificationTime: stat.ModTime(),
 		}, nil
 	case errors.Is(err, os.ErrNotExist):
-		return nil, nil, ErrBlobNotFound
+		return nil, ErrBlobNotFound
 	default:
-		return nil, nil, err
+		return nil, err
 	}
 }
