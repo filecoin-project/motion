@@ -4,8 +4,10 @@ import (
 	"os"
 	"os/signal"
 
+	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/motion"
 	"github.com/filecoin-project/motion/blob"
+	"github.com/filecoin-project/motion/wallet"
 	"github.com/ipfs/go-log/v2"
 	"github.com/urfave/cli/v2"
 )
@@ -32,12 +34,39 @@ func main() {
 				Usage:       "Whether to use experimental RIBS as the storage and deal making",
 				DefaultText: "Local storage is used",
 			},
+			&cli.StringFlag{
+				Name:        "localWalletDir",
+				Usage:       "The path to the local wallet directory.",
+				DefaultText: "Defaults to '<user-home-directory>/.motion/wallet' with wallet key auto-generated if not present. Note that the directory permissions must be at most 0600.",
+				EnvVars:     []string{"MOTION_LOCAL_WALLET_DIR"},
+			},
+			&cli.BoolFlag{
+				Name:  "localWalletGenerateIfNotExist",
+				Usage: "Whether to generate the local wallet key if none is found",
+				Value: true,
+			},
 		},
 		Action: func(cctx *cli.Context) error {
+
+			localWalletDir := cctx.String("localWalletDir")
+			localWalletGenIfNotExist := cctx.Bool("localWalletGenerateIfNotExist")
+			ks, err := wallet.DefaultDiskKeyStoreOpener(localWalletDir, localWalletGenIfNotExist)()
+			if err != nil {
+				logger.Errorw("Failed to instantiate local wallet keystore", "err", err)
+				return err
+			}
+			wallet, err := wallet.New(
+				wallet.WithKeyStoreOpener(func() (types.KeyStore, error) { return ks, nil }),
+				wallet.WithGenerateKeyIfNotExist(localWalletGenIfNotExist))
+			if err != nil {
+				logger.Errorw("Failed to instantiate local wallet", "err", err)
+				return err
+			}
+
 			storeDir := cctx.String("storeDir")
 			var store blob.Store
 			if cctx.Bool("experimentalRibsStore") {
-				rbstore, err := blob.NewRibsStore(storeDir)
+				rbstore, err := blob.NewRibsStore(storeDir, ks)
 				if err != nil {
 					return err
 				}
@@ -52,7 +81,7 @@ func main() {
 				logger.Infow("Using local blob store", "storeDir", storeDir)
 			}
 
-			m, err := motion.New(motion.WithBlobStore(store))
+			m, err := motion.New(motion.WithBlobStore(store), motion.WithWallet(wallet))
 			if err != nil {
 				logger.Fatalw("Failed to instantiate Motion", "err", err)
 			}

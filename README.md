@@ -16,8 +16,11 @@ COMMANDS:
    help, h  Shows a list of commands or help for one command
 
 GLOBAL OPTIONS:
-   --storeDir value  The path at which to store Motion data (default: OS Temporary directory) [$MOTION_STORE_DIR]
-   --help, -h        show help
+   --storeDir value                 The path at which to store Motion data (default: OS Temporary directory) [$MOTION_STORE_DIR]
+   --experimentalRibsStore          Whether to use experimental RIBS as the storage and deal making (default: Local storage is used)
+   --localWalletDir value           The path to the local wallet directory. (default: Defaults to '<user-home-directory>/.motion/wallet' with wallet key auto-generated if not present. Note that the directory permissions must be at most 0600.) [$MOTION_LOCAL_WALLET_DIR]
+   --localWalletGenerateIfNotExist  Whether to generate the local wallet key if none is found (default: true)
+   --help, -h
 ```
 
 ## Run Server Locally
@@ -84,7 +87,18 @@ Not yet implemented.
 See the [Motion OpenAPI specification](openapi.yaml).
 
 ## Status
+
 :construction: This project is currently under active development.
+
+## Local Development
+
+To set up `filecoin-ffi` dependencies, run:
+
+```shell
+make build
+```
+
+This is only necessary to run once. After that you can use the regular `go build` command to build Motion from source.
 
 ## License
 
