@@ -11,12 +11,14 @@ import (
 	"path"
 	"time"
 
+	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/google/uuid"
 	"github.com/ipfs/boxo/chunker"
 	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
 	"github.com/lotus-web3/ribs"
 	"github.com/lotus-web3/ribs/rbdeal"
+	"github.com/lotus-web3/ribs/ributil"
 	"github.com/multiformats/go-multihash"
 )
 
@@ -52,20 +54,22 @@ type (
 )
 
 // NewRibsStore instantiates a new experimental RIBS store.
-func NewRibsStore(dir string) (*RibsStore, error) {
-	rbdealDir := path.Join(path.Clean(dir), "rbdeal")
+func NewRibsStore(dir string, ks types.KeyStore) (*RibsStore, error) {
+	dir = path.Clean(dir)
+	rbdealDir := path.Join(dir, "rbdeal")
 	if err := os.Mkdir(rbdealDir, 0750); err != nil && !errors.Is(err, os.ErrExist) {
-		return nil, fmt.Errorf("failed to create internal directories: %w", err)
+		return nil, fmt.Errorf("failed to create RIBS deal directory: %w", err)
 	}
-	indexDir := path.Join(path.Clean(dir), "index")
+	indexDir := path.Join(dir, "index")
 	if err := os.Mkdir(indexDir, 0750); err != nil && !errors.Is(err, os.ErrExist) {
-		return nil, fmt.Errorf("failed to create internal directories: %w", err)
+		return nil, fmt.Errorf("failed to create RIBS internal directory: %w", err)
 	}
 
-	// TODO Path to wallet is hardcoded in RIBS. Parameterise it and allow user to configure
-	//      See: https://github.com/FILCAT/ribs/blob/7c8766206ec1e5ec30c613cde2b3a49d0ccf25d0/rbdeal/ribs.go#L156
+	rbs, err := rbdeal.Open(rbdealDir,
+		rbdeal.WithLocalWalletOpener(func(string) (*ributil.LocalWallet, error) {
+			return ributil.NewWallet(ks)
+		}))
 
-	rbs, err := rbdeal.Open(rbdealDir)
 	if err != nil {
 		return nil, err
 	}

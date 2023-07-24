@@ -5,6 +5,7 @@ import (
 
 	"github.com/filecoin-project/motion/api/server"
 	"github.com/filecoin-project/motion/blob"
+	"github.com/filecoin-project/motion/wallet"
 )
 
 type (
@@ -13,6 +14,7 @@ type (
 	options struct {
 		serverOptions []server.Option
 		blobStore     blob.Store
+		wallet        *wallet.Wallet
 	}
 )
 
@@ -46,6 +48,15 @@ func WithServerOptions(serverOptions ...server.Option) Option {
 func WithBlobStore(s blob.Store) Option {
 	return func(o *options) error {
 		o.blobStore = s
+		return nil
+	}
+}
+
+// WithWallet sets the wallet used by Motion to interact with FileCoin network.
+// Defaults to wallet.New.
+func WithWallet(w *wallet.Wallet) Option {
+	return func(o *options) error {
+		o.wallet = w
 		return nil
 	}
 }
