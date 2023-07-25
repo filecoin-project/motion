@@ -71,7 +71,7 @@ func NewRibsStore(dir string) (*RibsStore, error) {
 	}
 	return &RibsStore{
 		ribs:     rbs,
-		maxSize:  32 << 30, // 32 GiB
+		maxSize:  31 << 30, // 31 GiB
 		indexDir: indexDir,
 	}, nil
 
