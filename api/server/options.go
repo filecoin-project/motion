@@ -12,7 +12,7 @@ type (
 func newOptions(o ...Option) (*options, error) {
 	opts := &options{
 		httpListenAddr: "0.0.0.0:40080",
-		maxBlobLength:  32 << 30, // 32 GiB
+		maxBlobLength:  31 << 30, // 31 GiB
 	}
 	for _, apply := range o {
 		if err := apply(opts); err != nil {
@@ -32,7 +32,7 @@ func WithHttpListenAddr(addr string) Option {
 }
 
 // WithMaxBlobLength sets the maximum blob length accepted by the HTTP blob upload API.
-// Defaults to 32 GiB.
+// Defaults to 31 GiB.
 func WithMaxBlobLength(l uint64) Option {
 	return func(o *options) error {
 		o.maxBlobLength = l
