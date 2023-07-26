@@ -18,6 +18,9 @@ COPY --from=build /go/src/motion/extern/filecoin-ffi/filcrypto.h \
                   /go/src/motion/extern/filecoin-ffi/filcrypto.pc \
                   /go/src/motion/extern/filecoin-ffi/libfilcrypto.a \
                   /usr/lib/*/libhwloc.so.15 \
+                  /usr/lib/*/libOpenCL.so.1 \
+                  /usr/lib/*/libudev.so.1 \
+                  /lib/*/libgcc_s.so.1 \
                   /usr/lib/
 
 ENTRYPOINT ["/usr/bin/motion"]
