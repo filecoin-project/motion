@@ -27,6 +27,7 @@ func (m *HttpServer) handlePostBlob(w http.ResponseWriter, r *http.Request) {
 		respondWithJson(w, errResponseNotStreamContentType, http.StatusBadRequest)
 		return
 	}
+	body := r.Body
 	var contentLength uint64
 	if value := r.Header.Get("Content-Length"); value != "" {
 		var err error
@@ -38,9 +39,14 @@ func (m *HttpServer) handlePostBlob(w http.ResponseWriter, r *http.Request) {
 			respondWithJson(w, errResponseContentLengthTooLarge(m.maxBlobLength), http.StatusBadRequest)
 			return
 		}
+		// Wrap body reader to signal content length to upstream components.
+		body = sizerReadCloser{
+			ReadCloser: r.Body,
+			size:       int64(contentLength),
+		}
 	}
-	defer r.Body.Close()
-	desc, err := m.store.Put(r.Context(), r.Body)
+	defer body.Close()
+	desc, err := m.store.Put(r.Context(), body)
 	switch err {
 	case nil:
 	case blob.ErrBlobTooLarge:
