@@ -1,9 +1,14 @@
 package main
 
 import (
+	"net/http"
 	"os"
 	"os/signal"
 
+	"github.com/data-preservation-programs/singularity/client"
+	httpclient "github.com/data-preservation-programs/singularity/client/http"
+	libclient "github.com/data-preservation-programs/singularity/client/lib"
+	"github.com/data-preservation-programs/singularity/database"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/motion"
 	"github.com/filecoin-project/motion/blob"
@@ -45,6 +50,16 @@ func main() {
 				Usage: "Whether to generate the local wallet key if none is found",
 				Value: true,
 			},
+			&cli.BoolFlag{
+				Name:        "experimentalSingularityStore",
+				Usage:       "whether to use experimental Singularity store as the storage and deal making engine",
+				DefaultText: "Local storage is used",
+			},
+			&cli.StringFlag{
+				Name:        "experimentalRemoteSingularityAPIUrl",
+				Usage:       "when using a singularity as the storage engine, if set, uses a remote HTTP API to interface with Singularity",
+				DefaultText: "use singularity as a code library",
+			},
 		},
 		Action: func(cctx *cli.Context) error {
 
@@ -76,6 +91,30 @@ func main() {
 					return err
 				}
 				store = rbstore
+			} else if cctx.Bool("experimentalSingularityStore") {
+				singularityAPIUrl := cctx.String("experimentalRemoteSingularityAPIUrl")
+				var client client.Client
+				if singularityAPIUrl != "" {
+					client = httpclient.NewHTTPClient(http.DefaultClient, singularityAPIUrl)
+				} else {
+					db, err := database.OpenWithDefaults("sqlite:" + storeDir + "/singularity.db")
+					if err != nil {
+						logger.Errorw("Failed to open singularity database", "err", err)
+						return err
+					}
+					client, err = libclient.NewClient(db)
+					if err != nil {
+						logger.Errorw("Failed to get singularity client", "err", err)
+						return err
+					}
+				}
+				singularityStore := blob.NewSingularityStore(storeDir, client)
+				logger.Infow("Using Singularity blob store", "storeDir", storeDir)
+				if err := singularityStore.Start(cctx.Context); err != nil {
+					logger.Errorw("Failed to start Singularity blob store", "err", err)
+					return err
+				}
+				store = singularityStore
 			} else {
 				store = blob.NewLocalStore(storeDir)
 				logger.Infow("Using local blob store", "storeDir", storeDir)
