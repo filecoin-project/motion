@@ -56,7 +56,7 @@ func main() {
 				DefaultText: "Local storage is used",
 			},
 			&cli.StringFlag{
-				Name:        "remoteSingularityAPIUrl",
+				Name:        "experimentalRemoteSingularityAPIUrl",
 				Usage:       "when using a singularity as the storage engine, if set, uses a remote HTTP API to interface with Singularity",
 				DefaultText: "use singularity as a code library",
 			},
@@ -92,7 +92,7 @@ func main() {
 				}
 				store = rbstore
 			} else if cctx.Bool("experimentalSingularityStore") {
-				singularityAPIUrl := cctx.String("remoteSingularityAPIUrl")
+				singularityAPIUrl := cctx.String("experimentalRemoteSingularityAPIUrl")
 				var client client.Client
 				if singularityAPIUrl != "" {
 					client = httpclient.NewHTTPClient(http.DefaultClient, singularityAPIUrl)

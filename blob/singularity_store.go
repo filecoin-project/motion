@@ -15,8 +15,8 @@ import (
 	"github.com/data-preservation-programs/singularity/handler/datasource"
 )
 
-const MOTION_DATASET_NAME = "MOTION_DATASET"
-const MAX_CAR_SIZE = "31.5GiB"
+const motionDatasetName = "MOTION_DATASET"
+const maxCarSize = "31.5GiB"
 
 type SingularityStore struct {
 	local             *LocalStore
@@ -34,8 +34,8 @@ func NewSingularityStore(dir string, singularityClient client.Client) *Singulari
 
 func (l *SingularityStore) Start(ctx context.Context) error {
 	_, err := l.singularityClient.CreateDataset(ctx, dataset.CreateRequest{
-		Name:       MOTION_DATASET_NAME,
-		MaxSizeStr: MAX_CAR_SIZE,
+		Name:       motionDatasetName,
+		MaxSizeStr: maxCarSize,
 	})
 	var asDuplicatedRecord client.DuplicateRecordError
 
@@ -43,14 +43,14 @@ func (l *SingularityStore) Start(ctx context.Context) error {
 	if err != nil && !errors.As(err, &asDuplicatedRecord) {
 		return err
 	}
-	source, err := l.singularityClient.CreateLocalSource(ctx, MOTION_DATASET_NAME, datasource.LocalRequest{
+	source, err := l.singularityClient.CreateLocalSource(ctx, motionDatasetName, datasource.LocalRequest{
 		SourcePath:        l.local.dir,
 		RescanInterval:    "0",
 		DeleteAfterExport: false,
 	})
 	// handle source already created
 	if errors.As(err, &asDuplicatedRecord) {
-		sources, err := l.singularityClient.ListSourcesByDataset(ctx, MOTION_DATASET_NAME)
+		sources, err := l.singularityClient.ListSourcesByDataset(ctx, motionDatasetName)
 		if err != nil {
 			return err
 		}
@@ -104,6 +104,9 @@ func (s *SingularityStore) Get(ctx context.Context, id ID) (io.ReadSeekCloser, e
 	// this is largely artificial -- we're verifying the singularity item, but just reading from
 	// the local store
 	idStream, err := os.Open(path.Join(s.local.dir, id.String()+".id"))
+	if err != nil {
+		return nil, err
+	}
 	itemIDString, err := io.ReadAll(idStream)
 	if err != nil {
 		return nil, err
@@ -122,6 +125,9 @@ func (s *SingularityStore) Get(ctx context.Context, id ID) (io.ReadSeekCloser, e
 	}
 	var decoded ID
 	err = decoded.Decode(strings.TrimSuffix(path.Base(item.Path), path.Ext(item.Path)))
+	if err != nil {
+		return nil, err
+	}
 	return s.local.Get(ctx, decoded)
 }
 
@@ -129,6 +135,9 @@ func (s *SingularityStore) Describe(ctx context.Context, id ID) (*Descriptor, er
 	// this is largely artificial -- we're verifying the singularity item, but just reading from
 	// the local store
 	idStream, err := os.Open(path.Join(s.local.dir, id.String()+".id"))
+	if err != nil {
+		return nil, err
+	}
 	itemIDString, err := io.ReadAll(idStream)
 	if err != nil {
 		return nil, err
@@ -147,5 +156,8 @@ func (s *SingularityStore) Describe(ctx context.Context, id ID) (*Descriptor, er
 	}
 	var decoded ID
 	err = decoded.Decode(strings.TrimSuffix(path.Base(item.Path), path.Ext(item.Path)))
+	if err != nil {
+		return nil, err
+	}
 	return s.local.Describe(ctx, decoded)
 }
