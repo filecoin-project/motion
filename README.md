@@ -1,13 +1,13 @@
 # :motorcycle: motion
 
-Motion is a service to propel data onto FileCoin network via a simple easy to use API. It aims to create an easy path for independent software vendors to integrate FileCoin as a storage layer.
+Motion is a service to propel data onto Filecoin network via a simple easy to use API. It aims to create an easy path for independent software vendors to integrate Filecoin as a storage layer.
 
 ## Usage
 
 ```text
 $ motion --help
 NAME:
-   motion - Propelling data onto FileCoin
+   motion - Propelling data onto Filecoin
 
 USAGE:
    motion [global options] command [command options] [arguments...]
@@ -27,7 +27,7 @@ GLOBAL OPTIONS:
 
 ### Prerequisites
 
-* Docker container runtime (or your favourite container runtime). The reminder of this README assumes `docker`.
+* Docker container runtime (or your favourite container runtime). The remainder of this README assumes `docker`.
 * `curl` (or your favourite HTTP client). The reminder of this README assumes `curl`
 
 ### Start Motion API
