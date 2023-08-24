@@ -13,6 +13,7 @@ import (
 	"github.com/data-preservation-programs/singularity/client"
 	"github.com/data-preservation-programs/singularity/handler/dataset"
 	"github.com/data-preservation-programs/singularity/handler/datasource"
+	"github.com/data-preservation-programs/singularity/service/epochutil"
 )
 
 const motionDatasetName = "MOTION_DATASET"
@@ -115,7 +116,7 @@ func (s *SingularityStore) Get(ctx context.Context, id ID) (io.ReadSeekCloser, e
 	if err != nil {
 		return nil, err
 	}
-	item, err := s.singularityClient.GetItem(ctx, itemID)
+	item, err := s.singularityClient.GetFile(ctx, itemID)
 	var asNotFoundError client.NotFoundError
 	if errors.As(err, &asNotFoundError) {
 		return nil, ErrBlobNotFound
@@ -146,7 +147,7 @@ func (s *SingularityStore) Describe(ctx context.Context, id ID) (*Descriptor, er
 	if err != nil {
 		return nil, err
 	}
-	item, err := s.singularityClient.GetItem(ctx, itemID)
+	item, err := s.singularityClient.GetFile(ctx, itemID)
 	var asNotFoundError client.NotFoundError
 	if errors.As(err, &asNotFoundError) {
 		return nil, ErrBlobNotFound
@@ -159,5 +160,22 @@ func (s *SingularityStore) Describe(ctx context.Context, id ID) (*Descriptor, er
 	if err != nil {
 		return nil, err
 	}
-	return s.local.Describe(ctx, decoded)
+	descriptor, err := s.local.Describe(ctx, decoded)
+	if err != nil {
+		return nil, err
+	}
+	deals, err := s.singularityClient.GetFileDeals(ctx, itemID)
+	replicas := make([]Replica, 0, len(deals))
+	for _, deal := range deals {
+		replicas = append(replicas, Replica{
+			// TODO: figure out how to get LastVerified
+			Provider:   deal.Provider,
+			Status:     string(deal.State),
+			Expiration: epochutil.EpochToTime(deal.EndEpoch),
+		})
+	}
+	descriptor.Status = &Status{
+		Replicas: replicas,
+	}
+	return descriptor, nil
 }
