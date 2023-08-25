@@ -1,4 +1,4 @@
-package blob
+package ribs
 
 import (
 	"bytes"
@@ -12,8 +12,9 @@ import (
 	"time"
 
 	"github.com/filecoin-project/lotus/chain/types"
+	"github.com/filecoin-project/motion/blob"
 	"github.com/google/uuid"
-	"github.com/ipfs/boxo/chunker"
+	chunk "github.com/ipfs/boxo/chunker"
 	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
 	"github.com/lotus-web3/ribs"
@@ -26,7 +27,7 @@ import (
 const ribsStoreChunkSize = 1 << 20 // 1 MiB
 
 var (
-	_ Store             = (*RibsStore)(nil)
+	_ blob.Store        = (*RibsStore)(nil)
 	_ io.ReadSeekCloser = (*ribsStoredBlobReader)(nil)
 )
 
@@ -39,7 +40,7 @@ type (
 		indexDir string
 	}
 	ribsStoredBlob struct {
-		*Descriptor
+		*blob.Descriptor
 		Chunks []cid.Cid `json:"chunks"`
 	}
 	ribsStoredBlobReader struct {
@@ -85,7 +86,7 @@ func (r *RibsStore) Start(_ context.Context) error {
 	// TODO: change RIBS to take context.
 	return r.ribs.Start()
 }
-func (r *RibsStore) Put(ctx context.Context, in io.ReadCloser) (*Descriptor, error) {
+func (r *RibsStore) Put(ctx context.Context, in io.ReadCloser) (*blob.Descriptor, error) {
 
 	// Generate ID early to fail early if generation fails.
 	id, err := uuid.NewRandom()
@@ -114,7 +115,7 @@ SplitLoop:
 		case nil:
 			size += len(b)
 			if size > r.maxSize {
-				return nil, ErrBlobTooLarge
+				return nil, blob.ErrBlobTooLarge
 			}
 			mh, err := multihash.Sum(b, multihash.SHA2_256, -1)
 			if err != nil {
@@ -136,8 +137,8 @@ SplitLoop:
 		return nil, err
 	}
 	storedBlob := &ribsStoredBlob{
-		Descriptor: &Descriptor{
-			ID:               ID(id),
+		Descriptor: &blob.Descriptor{
+			ID:               blob.ID(id),
 			Size:             uint64(size),
 			ModificationTime: modtime,
 		},
@@ -153,7 +154,7 @@ SplitLoop:
 	return storedBlob.Descriptor, nil
 }
 
-func (r *RibsStore) Get(ctx context.Context, id ID) (io.ReadSeekCloser, error) {
+func (r *RibsStore) Get(ctx context.Context, id blob.ID) (io.ReadSeekCloser, error) {
 	storedBlob, err := r.describeRibsStoredBlob(ctx, id)
 	if err != nil {
 		return nil, err
@@ -166,7 +167,7 @@ func (r *RibsStore) Get(ctx context.Context, id ID) (io.ReadSeekCloser, error) {
 	return reader, nil
 }
 
-func (r *RibsStore) Describe(ctx context.Context, id ID) (*Descriptor, error) {
+func (r *RibsStore) Describe(ctx context.Context, id blob.ID) (*blob.Descriptor, error) {
 	storedBlob, err := r.describeRibsStoredBlob(ctx, id)
 	if err != nil {
 		return nil, err
@@ -174,7 +175,7 @@ func (r *RibsStore) Describe(ctx context.Context, id ID) (*Descriptor, error) {
 	return storedBlob.Descriptor, err
 }
 
-func (r *RibsStore) describeRibsStoredBlob(_ context.Context, id ID) (*ribsStoredBlob, error) {
+func (r *RibsStore) describeRibsStoredBlob(_ context.Context, id blob.ID) (*ribsStoredBlob, error) {
 	switch index, err := os.Open(path.Join(r.indexDir, id.String())); {
 	case err == nil:
 		var storedBlob ribsStoredBlob
@@ -182,7 +183,7 @@ func (r *RibsStore) describeRibsStoredBlob(_ context.Context, id ID) (*ribsStore
 		// TODO: populate descriptor status with Filecoin chain data about the stored blob.
 		return &storedBlob, err
 	case errors.Is(err, os.ErrNotExist):
-		return nil, ErrBlobNotFound
+		return nil, blob.ErrBlobNotFound
 	default:
 		return nil, err
 	}

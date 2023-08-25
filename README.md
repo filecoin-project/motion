@@ -17,7 +17,6 @@ COMMANDS:
 
 GLOBAL OPTIONS:
    --storeDir value                                                             The path at which to store Motion data (default: OS Temporary directory) [$MOTION_STORE_DIR]
-   --experimentalRibsStore                                                      Whether to use experimental RIBS as the storage and deal making (default: Local storage is used)
    --localWalletDir value                                                       The path to the local wallet directory. (default: Defaults to '<user-home-directory>/.motion/wallet' with wallet key auto-generated if not present. Note that the directory permissions must be at most 0600.) [$MOTION_LOCAL_WALLET_DIR]
    --localWalletGenerateIfNotExist                                              Whether to generate the local wallet key if none is found (default: true)
    --experimentalSingularityStore                                               whether to use experimental Singularity store as the storage and deal making engine (default: Local storage is used)
