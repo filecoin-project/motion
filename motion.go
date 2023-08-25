@@ -11,7 +11,7 @@ var (
 	logger = log.Logger("motion")
 )
 
-// Motion is a service that exposes a simple HTTP API to create / retrieve blobs of data to and from FileCoin Network.
+// Motion is a service that exposes a simple HTTP API to create / retrieve blobs of data to and from Filecoin Network.
 type Motion struct {
 	*options
 	httpServer *server.HttpServer
