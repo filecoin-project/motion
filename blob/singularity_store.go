@@ -165,6 +165,9 @@ func (s *SingularityStore) Describe(ctx context.Context, id ID) (*Descriptor, er
 		return nil, err
 	}
 	deals, err := s.singularityClient.GetFileDeals(ctx, itemID)
+	if err != nil {
+		return nil, err
+	}
 	replicas := make([]Replica, 0, len(deals))
 	for _, deal := range deals {
 		replicas = append(replicas, Replica{
