@@ -97,7 +97,8 @@ func main() {
 				if singularityAPIUrl != "" {
 					client = httpclient.NewHTTPClient(http.DefaultClient, singularityAPIUrl)
 				} else {
-					db, err := database.OpenWithDefaults("sqlite:" + storeDir + "/singularity.db")
+					db, closer, err := database.OpenWithLogger("sqlite:" + storeDir + "/singularity.db")
+					defer closer.Close()
 					if err != nil {
 						logger.Errorw("Failed to open singularity database", "err", err)
 						return err

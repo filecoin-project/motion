@@ -9,11 +9,11 @@ require (
 	github.com/filecoin-project/go-state-types v0.12.0
 	github.com/filecoin-project/lotus v1.23.2-0.20230628201333-30a9f631653f
 	github.com/google/uuid v1.3.0
-	github.com/ipfs/boxo v0.11.0
+	github.com/ipfs/boxo v0.12.0
 	github.com/ipfs/go-block-format v0.1.2
 	github.com/ipfs/go-cid v0.4.1
 	github.com/ipfs/go-log/v2 v2.5.1
-	github.com/lotus-web3/ribs v0.0.0-20230720185531-31964053b4be
+	github.com/lotus-web3/ribs v0.0.0-20230823081917-bde324047c3d
 	github.com/multiformats/go-multihash v0.2.3
 	github.com/urfave/cli/v2 v2.25.7
 )
@@ -92,7 +92,7 @@ require (
 	github.com/filecoin-project/go-retrieval-types v1.2.0 // indirect
 	github.com/filecoin-project/go-statemachine v1.0.3 // indirect
 	github.com/filecoin-project/go-statestore v0.2.0 // indirect
-	github.com/filecoin-project/kubo-api-client v0.0.1 // indirect
+	github.com/filecoin-project/kubo-api-client v0.0.2-0.20230825144552-7a3b04db8cac // indirect
 	github.com/filecoin-project/lassie v0.15.1-0.20230824015921-0b0d13c3a980 // indirect
 	github.com/filecoin-project/specs-actors v0.9.15 // indirect
 	github.com/filecoin-project/specs-actors/v2 v2.3.6 // indirect
@@ -154,7 +154,7 @@ require (
 	github.com/ipfs/go-graphsync v0.14.7 // indirect
 	github.com/ipfs/go-ipfs-blockstore v1.3.0 // indirect
 	github.com/ipfs/go-ipfs-chunker v0.0.5 // indirect
-	github.com/ipfs/go-ipfs-cmds v0.9.0 // indirect
+	github.com/ipfs/go-ipfs-cmds v0.10.0 // indirect
 	github.com/ipfs/go-ipfs-delay v0.0.1 // indirect
 	github.com/ipfs/go-ipfs-ds-help v1.1.0 // indirect
 	github.com/ipfs/go-ipfs-exchange-interface v0.2.0 // indirect
@@ -175,7 +175,7 @@ require (
 	github.com/ipld/go-car v0.6.1 // indirect
 	github.com/ipld/go-car/v2 v2.10.2-0.20230622090957-499d0c909d33 // indirect
 	github.com/ipld/go-codec-dagpb v1.6.0 // indirect
-	github.com/ipld/go-ipld-prime v0.20.1-0.20230329011551-5056175565b0 // indirect
+	github.com/ipld/go-ipld-prime v0.21.0 // indirect
 	github.com/ipld/go-ipld-selector-text-lite v0.0.1 // indirect
 	github.com/ipni/go-libipni v0.0.8 // indirect
 	github.com/ipsn/go-secp256k1 v0.0.0-20180726113642-9d62b9f0bc52 // indirect

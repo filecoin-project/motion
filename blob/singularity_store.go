@@ -81,7 +81,7 @@ func (s *SingularityStore) Put(ctx context.Context, reader io.ReadCloser) (*Desc
 	if err != nil {
 		return nil, err
 	}
-	model, err := s.singularityClient.PushItem(ctx, s.sourceID, datasource.ItemInfo{Path: desc.ID.String() + ".bin"})
+	model, err := s.singularityClient.PushFile(ctx, s.sourceID, datasource.FileInfo{Path: desc.ID.String() + ".bin"})
 	if err != nil {
 		return nil, fmt.Errorf("error creating singularity entry: %w", err)
 	}
