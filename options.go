@@ -3,6 +3,7 @@ package motion
 import (
 	"os"
 
+	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/motion/api/server"
 	"github.com/filecoin-project/motion/blob"
 	"github.com/filecoin-project/motion/wallet"
@@ -12,9 +13,10 @@ type (
 	// Option represents a configurable parameter in Motion service.
 	Option  func(*options) error
 	options struct {
-		serverOptions []server.Option
-		blobStore     blob.Store
-		wallet        *wallet.Wallet
+		serverOptions    []server.Option
+		blobStore        blob.Store
+		wallet           *wallet.Wallet
+		storageProviders []address.Address
 	}
 )
 
@@ -52,11 +54,20 @@ func WithBlobStore(s blob.Store) Option {
 	}
 }
 
-// WithWallet sets the wallet used by Motion to interact with FileCoin network.
+// WithWallet sets the wallet used by Motion to interact with Filecoin network.
 // Defaults to wallet.New.
 func WithWallet(w *wallet.Wallet) Option {
 	return func(o *options) error {
 		o.wallet = w
+		return nil
+	}
+}
+
+// WithStorageProviders sets the list of Filecoin storage providers to make deals with.
+// Defaults to no deals, i.e. local storage only if unspecified.
+func WithStorageProviders(sp ...address.Address) Option {
+	return func(o *options) error {
+		o.storageProviders = sp
 		return nil
 	}
 }

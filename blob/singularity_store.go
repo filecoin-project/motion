@@ -92,7 +92,7 @@ func (s *SingularityStore) Put(ctx context.Context, reader io.ReadCloser) (*Desc
 	defer idFile.Close()
 	_, err = idFile.Write([]byte(strconv.FormatUint(model.ID, 10)))
 	if err != nil {
-		os.Remove(idFile.Name())
+		_ = os.Remove(idFile.Name())
 		return nil, err
 	}
 	if err = os.Rename(idFile.Name(), path.Join(s.local.dir, desc.ID.String()+".id")); err != nil {

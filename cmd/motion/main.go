@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -9,6 +10,7 @@ import (
 	httpclient "github.com/data-preservation-programs/singularity/client/http"
 	libclient "github.com/data-preservation-programs/singularity/client/lib"
 	"github.com/data-preservation-programs/singularity/database"
+	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/motion"
 	"github.com/filecoin-project/motion/blob"
@@ -25,7 +27,7 @@ func main() {
 	}
 	app := cli.App{
 		Name:  "motion",
-		Usage: "Propelling data onto FileCoin",
+		Usage: "Propelling data onto Filecoin",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:        "storeDir",
@@ -59,6 +61,12 @@ func main() {
 				Name:        "experimentalRemoteSingularityAPIUrl",
 				Usage:       "when using a singularity as the storage engine, if set, uses a remote HTTP API to interface with Singularity",
 				DefaultText: "use singularity as a code library",
+			},
+			&cli.StringSliceFlag{
+				Name:        "storageProvider",
+				Aliases:     []string{"sp"},
+				Usage:       "Storage providers to which to make deals with. Multiple providers may be specified.",
+				DefaultText: "No deals are made to replicate data onto storage providers.",
 			},
 		},
 		Action: func(cctx *cli.Context) error {
@@ -121,7 +129,21 @@ func main() {
 				logger.Infow("Using local blob store", "storeDir", storeDir)
 			}
 
-			m, err := motion.New(motion.WithBlobStore(store), motion.WithWallet(wallet))
+			// Parse any configured storage povider addresses.
+			sps := cctx.StringSlice("storageProvider")
+			spAddrs := make([]address.Address, 0, len(sps))
+			for _, sp := range sps {
+				spAddr, err := address.NewFromString(sp)
+				if err != nil {
+					return fmt.Errorf("storage provider '%s' is not a valid address: %w", sp, err)
+				}
+				spAddrs = append(spAddrs, spAddr)
+			}
+			m, err := motion.New(
+				motion.WithBlobStore(store),
+				motion.WithWallet(wallet),
+				motion.WithStorageProviders(spAddrs...),
+			)
 			if err != nil {
 				logger.Fatalw("Failed to instantiate Motion", "err", err)
 			}
