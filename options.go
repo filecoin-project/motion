@@ -63,6 +63,8 @@ func WithWallet(w *wallet.Wallet) Option {
 	}
 }
 
+// WithStorageProviders sets the list of Filecoin storage providers to make deals with.
+// Defaults to no deals, i.e. local storage only if unspecified.
 func WithStorageProviders(sp ...address.Address) Option {
 	return func(o *options) error {
 		o.storageProviders = sp
