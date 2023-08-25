@@ -179,7 +179,7 @@ func (r *RibsStore) describeRibsStoredBlob(_ context.Context, id ID) (*ribsStore
 	case err == nil:
 		var storedBlob ribsStoredBlob
 		err := json.NewDecoder(index).Decode(&storedBlob)
-		// TODO: populate descriptor status with FileCoin chain data about the stored blob.
+		// TODO: populate descriptor status with Filecoin chain data about the stored blob.
 		return &storedBlob, err
 	case errors.Is(err, os.ErrNotExist):
 		return nil, ErrBlobNotFound

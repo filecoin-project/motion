@@ -16,11 +16,14 @@ COMMANDS:
    help, h  Shows a list of commands or help for one command
 
 GLOBAL OPTIONS:
-   --storeDir value                 The path at which to store Motion data (default: OS Temporary directory) [$MOTION_STORE_DIR]
-   --experimentalRibsStore          Whether to use experimental RIBS as the storage and deal making (default: Local storage is used)
-   --localWalletDir value           The path to the local wallet directory. (default: Defaults to '<user-home-directory>/.motion/wallet' with wallet key auto-generated if not present. Note that the directory permissions must be at most 0600.) [$MOTION_LOCAL_WALLET_DIR]
-   --localWalletGenerateIfNotExist  Whether to generate the local wallet key if none is found (default: true)
-   --help, -h
+   --storeDir value                                                             The path at which to store Motion data (default: OS Temporary directory) [$MOTION_STORE_DIR]
+   --experimentalRibsStore                                                      Whether to use experimental RIBS as the storage and deal making (default: Local storage is used)
+   --localWalletDir value                                                       The path to the local wallet directory. (default: Defaults to '<user-home-directory>/.motion/wallet' with wallet key auto-generated if not present. Note that the directory permissions must be at most 0600.) [$MOTION_LOCAL_WALLET_DIR]
+   --localWalletGenerateIfNotExist                                              Whether to generate the local wallet key if none is found (default: true)
+   --experimentalSingularityStore                                               whether to use experimental Singularity store as the storage and deal making engine (default: Local storage is used)
+   --experimentalRemoteSingularityAPIUrl value                                  when using a singularity as the storage engine, if set, uses a remote HTTP API to interface with Singularity (default: use singularity as a code library)
+   --storageProvider value, --sp value [ --storageProvider value, --sp value ]  Storage providers to which to make deals with. Multiple providers may be specified. (default: No deals are made to replicate data onto storage providers.)
+   --help, -h                                                                   show help
 ```
 
 ## Run Server Locally

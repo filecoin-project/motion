@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Motion Data Storage and Retrieval API
-  description: This is the API for exchanging data with FileCoin network via Motion.
+  description: This is the API for exchanging data with Filecoin network via Motion.
   version: 0.0.0
 servers:
   - url: 'http://localhost:40080'
@@ -106,7 +106,7 @@ paths:
                       properties:
                         provider:
                           type: string
-                          description: 'ID of the FileCoin storage provider.'
+                          description: 'ID of the Filecoin storage provider.'
                         status:
                           type: string
                           description: 'Status of this replica. Can be "active", "slashed" or "expired".'
