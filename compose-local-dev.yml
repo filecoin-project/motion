@@ -1,0 +1,35 @@
+version: "3"
+
+services:
+  db:
+    extends:
+      file: docker-compose.yml
+      service: db
+  singularity_api:
+    extends:
+      file: docker-compose.yml
+      service: singularity_api
+    depends_on:
+      db:
+        condition: service_healthy
+  singularity_dataset_worker:
+    extends:
+      file: docker-compose.yml
+      service: singularity_dataset_worker
+    depends_on:
+      db:
+        condition: service_healthy
+  motion:
+    build: .
+    entrypoint: motion --experimentalSingularityStore --experimentalRemoteSingularityAPIUrl=http://singularity_api:9090
+    ports:
+      - 40080:40080
+    environment:
+      - MOTION_STORE_DIR=/usr/src/app/storage
+    volumes:
+      - motion-singularity-volume:/usr/src/app/storage
+    depends_on:
+      - singularity_api
+
+volumes:
+  motion-singularity-volume:
