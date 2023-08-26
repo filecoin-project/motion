@@ -16,6 +16,7 @@ require (
 	github.com/lotus-web3/ribs v0.0.0-20230823081917-bde324047c3d
 	github.com/multiformats/go-multihash v0.2.3
 	github.com/urfave/cli/v2 v2.25.7
+	github.com/ybbus/jsonrpc/v3 v3.1.4
 )
 
 require (
@@ -303,7 +304,6 @@ require (
 	github.com/whyrusleeping/chunker v0.0.0-20181014151217-fe64bd25879f // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
-	github.com/ybbus/jsonrpc/v3 v3.1.4 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20201027041543-1326539a0a0a // indirect
 	github.com/yunify/qingstor-sdk-go/v3 v3.2.0 // indirect
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
