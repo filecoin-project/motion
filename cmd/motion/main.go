@@ -10,6 +10,7 @@ import (
 	httpclient "github.com/data-preservation-programs/singularity/client/http"
 	libclient "github.com/data-preservation-programs/singularity/client/lib"
 	"github.com/data-preservation-programs/singularity/database"
+	"github.com/data-preservation-programs/singularity/service/epochutil"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/motion"
@@ -17,6 +18,7 @@ import (
 	"github.com/filecoin-project/motion/wallet"
 	"github.com/ipfs/go-log/v2"
 	"github.com/urfave/cli/v2"
+	"github.com/ybbus/jsonrpc/v3"
 )
 
 var logger = log.Logger("motion/cmd")
@@ -68,6 +70,20 @@ func main() {
 				Usage:       "Storage providers to which to make deals with. Multiple providers may be specified.",
 				DefaultText: "No deals are made to replicate data onto storage providers.",
 			},
+			&cli.StringFlag{
+				Name:     "lotusApi",
+				Category: "Lotus",
+				Usage:    "Lotus RPC API endpoint",
+				Value:    "https://api.node.glif.io/rpc/v1",
+				EnvVars:  []string{"LOTUS_API"},
+			},
+			&cli.StringFlag{
+				Name:     "lotusToken",
+				Category: "Lotus",
+				Usage:    "Lotus RPC API token",
+				Value:    "",
+				EnvVars:  []string{"LOTUS_TOKEN"},
+			},
 		},
 		Action: func(cctx *cli.Context) error {
 
@@ -88,6 +104,8 @@ func main() {
 
 			storeDir := cctx.String("storeDir")
 			var store blob.Store
+			lotusAPI := cctx.String("lotusApi")
+			lotusToken := cctx.String("lotusToken")
 			if cctx.Bool("experimentalRibsStore") {
 				rbstore, err := blob.NewRibsStore(storeDir, ks)
 				if err != nil {
@@ -105,12 +123,18 @@ func main() {
 				if singularityAPIUrl != "" {
 					client = httpclient.NewHTTPClient(http.DefaultClient, singularityAPIUrl)
 				} else {
-					db, err := database.OpenWithDefaults("sqlite:" + storeDir + "/singularity.db")
+					db, closer, err := database.OpenWithLogger("sqlite:" + storeDir + "/singularity.db")
+					defer closer.Close()
 					if err != nil {
 						logger.Errorw("Failed to open singularity database", "err", err)
 						return err
 					}
-					client, err = libclient.NewClient(db)
+					err = epochutil.Initialize(cctx.Context, lotusAPI, lotusToken)
+					if err != nil {
+						logger.Errorw("Failed to initialized epoch timing", "err", err)
+						return err
+					}
+					client, err = libclient.NewClient(db, jsonrpc.NewClient(lotusAPI))
 					if err != nil {
 						logger.Errorw("Failed to get singularity client", "err", err)
 						return err
