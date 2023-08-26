@@ -18,11 +18,15 @@ import (
 
 const motionDatasetName = "MOTION_DATASET"
 const maxCarSize = "31.5GiB"
+const packThreshold = 1 << 34
 
 type SingularityStore struct {
 	local             *LocalStore
 	sourceID          uint32
 	singularityClient client.Client
+	toPack            chan uint64
+	closing           chan struct{}
+	closed            chan struct{}
 }
 
 func NewSingularityStore(dir string, singularityClient client.Client) *SingularityStore {
@@ -30,6 +34,7 @@ func NewSingularityStore(dir string, singularityClient client.Client) *Singulari
 	return &SingularityStore{
 		local:             local,
 		singularityClient: singularityClient,
+		toPack:            make(chan uint64, 16),
 	}
 }
 
@@ -69,10 +74,47 @@ func (l *SingularityStore) Start(ctx context.Context) error {
 		return err
 	}
 	l.sourceID = source.ID
+	go l.runPackJobs()
 	return nil
 }
 
-func (l *SingularityStore) Shutdown(_ context.Context) error {
+func (l *SingularityStore) runPackJobs() {
+	ctx := context.Background()
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	go func() {
+		defer func() {
+			close(l.closed)
+		}()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case fileID := <-l.toPack:
+				outstanding, err := l.singularityClient.PrepareToPackFile(ctx, fileID)
+				if err != nil {
+					logger.Errorw("preparing to pack file", "fileID", fileID, "error", err)
+				}
+				if outstanding > packThreshold {
+					// mark outstanding pack jobs as ready to go so we can make CAR files
+					err := l.singularityClient.PrepareToPackSource(ctx, l.sourceID)
+					if err != nil {
+						logger.Errorw("preparing to pack source", "error", err)
+					}
+				}
+			}
+		}
+	}()
+	<-l.closing
+}
+
+func (l *SingularityStore) Shutdown(ctx context.Context) error {
+	close(l.closing)
+	select {
+	case <-ctx.Done():
+	case <-l.closed:
+	}
 	return nil
 }
 
@@ -81,16 +123,17 @@ func (s *SingularityStore) Put(ctx context.Context, reader io.ReadCloser) (*Desc
 	if err != nil {
 		return nil, err
 	}
-	model, err := s.singularityClient.PushFile(ctx, s.sourceID, datasource.FileInfo{Path: desc.ID.String() + ".bin"})
+	file, err := s.singularityClient.PushFile(ctx, s.sourceID, datasource.FileInfo{Path: desc.ID.String() + ".bin"})
 	if err != nil {
 		return nil, fmt.Errorf("error creating singularity entry: %w", err)
 	}
+
 	idFile, err := os.CreateTemp(s.local.dir, "motion_local_store_*.bin.temp")
 	if err != nil {
 		return nil, err
 	}
 	defer idFile.Close()
-	_, err = idFile.Write([]byte(strconv.FormatUint(model.ID, 10)))
+	_, err = idFile.Write([]byte(strconv.FormatUint(file.ID, 10)))
 	if err != nil {
 		_ = os.Remove(idFile.Name())
 		return nil, err

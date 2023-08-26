@@ -7,11 +7,16 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/ipfs/go-log/v2"
 )
 
 var (
 	ErrBlobTooLarge = errors.New("blob size exceeds the maximum allowed")
 	ErrBlobNotFound = errors.New("no blob is found with given ID")
+)
+
+var (
+	logger = log.Logger("motion/blobstore")
 )
 
 type (
