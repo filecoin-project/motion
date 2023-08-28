@@ -55,12 +55,12 @@ func main() {
 			},
 			&cli.BoolFlag{
 				Name:        "experimentalSingularityStore",
-				Usage:       "whether to use experimental Singularity store as the storage and deal making engine",
+				Usage:       "Whether to use experimental Singularity store as the storage and deal making engine",
 				DefaultText: "Local storage is used",
 			},
 			&cli.StringFlag{
 				Name:        "experimentalRemoteSingularityAPIUrl",
-				Usage:       "when using a singularity as the storage engine, if set, uses a remote HTTP API to interface with Singularity",
+				Usage:       "When using a singularity as the storage engine, if set, uses a remote HTTP API to interface with Singularity",
 				DefaultText: "use singularity as a code library",
 			},
 			&cli.StringSliceFlag{
