@@ -33,7 +33,25 @@ services:
     image: ghcr.io/data-preservation-programs/singularity:main
     command: run dataset-worker
     environment:
-      DATABASE_CONNECTION_STRING: postgres://postgres:postgres@db:5432/singularity
+      DATABASE_CONNECTION_STRING: postgres://${SINGULARITY_DB_USER:-postgres}:${SINGULARITY_DB_PASSWORD:-postgres}@db:5432/${SINGULARITY_DB_NAME:-singularity}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  singularity_deal_pusher:
+    image: ghcr.io/data-preservation-programs/singularity:main
+    command: run deal-pusher
+    environment:
+      DATABASE_CONNECTION_STRING: postgres://${SINGULARITY_DB_USER:-postgres}:${SINGULARITY_DB_PASSWORD:-postgres}@db:5432/${SINGULARITY_DB_NAME:-singularity}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  singularity_deal_tracker:
+    image: ghcr.io/data-preservation-programs/singularity:main
+    command: run deal-tracker
+    environment:
+      DATABASE_CONNECTION_STRING: postgres://${SINGULARITY_DB_USER:-postgres}:${SINGULARITY_DB_PASSWORD:-postgres}@db:5432/${SINGULARITY_DB_NAME:-singularity}
     depends_on:
       db:
         condition: service_healthy
