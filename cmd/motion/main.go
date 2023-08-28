@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"time"
 
 	"github.com/data-preservation-programs/singularity/client"
 	httpclient "github.com/data-preservation-programs/singularity/client/http"
@@ -12,6 +13,9 @@ import (
 	"github.com/data-preservation-programs/singularity/database"
 	"github.com/data-preservation-programs/singularity/service/epochutil"
 	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/big"
+	"github.com/filecoin-project/go-state-types/builtin"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/motion"
 	"github.com/filecoin-project/motion/blob"
@@ -78,6 +82,35 @@ func main() {
 				Usage:    "Lotus RPC API token",
 				Value:    "",
 				EnvVars:  []string{"LOTUS_TOKEN"},
+			},
+			&cli.UintFlag{
+				Name:        "replicationFactor",
+				Usage:       "The number of desired replicas per blob",
+				DefaultText: "Number of storage providers; see 'storageProvider' flag.",
+			},
+			&cli.Float64Flag{
+				Name:  "pricePerGiBEpoch",
+				Usage: "The maximum price per GiB per Epoch in attoFIL.",
+			},
+			&cli.Float64Flag{
+				Name:  "pricePerGiB",
+				Usage: "The maximum  price per GiB in attoFIL.",
+			},
+			&cli.Float64Flag{
+				Name:  "pricePerDeal",
+				Usage: "The maximum price per deal in attoFIL.",
+			},
+			&cli.DurationFlag{
+				Name:        "dealStartDelay",
+				Usage:       "The deal start epoch delay.",
+				DefaultText: "72 hours",
+				Value:       72 * time.Hour,
+			},
+			&cli.DurationFlag{
+				Name:        "dealDuration",
+				Usage:       "The duration of deals made on Filecoin",
+				DefaultText: "One year (356 days)",
+				Value:       356 * 24 * time.Hour,
 			},
 		},
 		Action: func(cctx *cli.Context) error {
@@ -150,6 +183,12 @@ func main() {
 				motion.WithBlobStore(store),
 				motion.WithWallet(wallet),
 				motion.WithStorageProviders(spAddrs...),
+				motion.WithReplicationFactor(cctx.Uint("replicationFactor")),
+				motion.WithPricePerGiBEpoch(attoFilToTokenAmount(cctx.Float64("pricePerGiBEpoch"))),
+				motion.WithPricePerGiB(attoFilToTokenAmount(cctx.Float64("pricePerGiB"))),
+				motion.WithPricePerDeal(attoFilToTokenAmount(cctx.Float64("pricePerDeal"))),
+				motion.WithDealStartDelay(durationToFilecoinEpoch(cctx.Duration("dealStartDelay"))),
+				motion.WithDealDuration(durationToFilecoinEpoch(cctx.Duration("dealDuration"))),
 			)
 			if err != nil {
 				logger.Fatalw("Failed to instantiate Motion", "err", err)
@@ -173,4 +212,12 @@ func main() {
 	if err := app.Run(os.Args); err != nil {
 		logger.Error(err)
 	}
+}
+
+func durationToFilecoinEpoch(d time.Duration) abi.ChainEpoch {
+	return abi.ChainEpoch(int64(d.Seconds()) / builtin.EpochDurationSeconds)
+}
+
+func attoFilToTokenAmount(v float64) abi.TokenAmount {
+	return big.NewInt(int64(v * 1e18))
 }
