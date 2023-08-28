@@ -2,8 +2,6 @@ module github.com/filecoin-project/motion
 
 go 1.20
 
-replace github.com/filecoin-project/filecoin-ffi => ./extern/filecoin-ffi
-
 require (
 	github.com/filecoin-project/go-address v1.1.0
 	github.com/filecoin-project/go-state-types v0.12.0
