@@ -2,6 +2,8 @@ package blob
 
 import (
 	"context"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -13,8 +15,10 @@ import (
 	"github.com/data-preservation-programs/singularity/client"
 	"github.com/data-preservation-programs/singularity/handler/dataset"
 	"github.com/data-preservation-programs/singularity/handler/datasource"
+	wallethandler "github.com/data-preservation-programs/singularity/handler/wallet"
 	"github.com/data-preservation-programs/singularity/model"
 	"github.com/data-preservation-programs/singularity/service/epochutil"
+	"github.com/filecoin-project/motion/wallet"
 )
 
 const motionDatasetName = "MOTION_DATASET"
@@ -24,16 +28,18 @@ const packThreshold = 1 << 34
 type SingularityStore struct {
 	local             *LocalStore
 	sourceID          uint32
+	wallet            *wallet.Wallet
 	singularityClient client.Client
 	toPack            chan uint64
 	closing           chan struct{}
 	closed            chan struct{}
 }
 
-func NewSingularityStore(dir string, singularityClient client.Client) *SingularityStore {
+func NewSingularityStore(dir string, wallet *wallet.Wallet, singularityClient client.Client) *SingularityStore {
 	local := NewLocalStore(dir)
 	return &SingularityStore{
 		local:             local,
+		wallet:            wallet,
 		singularityClient: singularityClient,
 		toPack:            make(chan uint64, 16),
 		closing:           make(chan struct{}),
@@ -77,6 +83,57 @@ func (l *SingularityStore) Start(ctx context.Context) error {
 			return err
 		}
 		l.sourceID = source.ID
+	}
+	// get default wallet encoded private key
+	address, err := l.wallet.GetDefault()
+	if err != nil {
+		return err
+	}
+	ki, err := l.wallet.WalletExport(ctx, address)
+	if err != nil {
+		return err
+	}
+
+	b, err := json.Marshal(ki)
+	if err != nil {
+		return err
+	}
+
+	pk := hex.EncodeToString(b)
+
+	// insure default wallet is imported to singularity
+	wallets, err := l.singularityClient.ListWallets(ctx)
+	var wallet *model.Wallet
+	for _, existing := range wallets {
+		if wallet.PrivateKey == pk {
+			wallet = &existing
+			break
+		}
+	}
+	if wallet == nil {
+		wallet, err = l.singularityClient.ImportWallet(ctx, wallethandler.ImportRequest{
+			PrivateKey: pk,
+		})
+
+		if err != nil {
+			return err
+		}
+	}
+
+	// insure wallet is assigned to dataset
+	wallets, err = l.singularityClient.ListWalletsByDataset(ctx, motionDatasetName)
+	walletFound := false
+	for _, existing := range wallets {
+		if existing.Address == wallet.Address {
+			walletFound = true
+			break
+		}
+	}
+	if !walletFound {
+		_, err := l.singularityClient.AddWalletToDataset(ctx, motionDatasetName, wallet.Address)
+		if err != nil {
+			return err
+		}
 	}
 	go l.runPreparationJobs()
 	return nil

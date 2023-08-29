@@ -157,7 +157,7 @@ func main() {
 						return err
 					}
 				}
-				singularityStore := blob.NewSingularityStore(storeDir, client)
+				singularityStore := blob.NewSingularityStore(storeDir, wallet, client)
 				logger.Infow("Using Singularity blob store", "storeDir", storeDir)
 				if err := singularityStore.Start(cctx.Context); err != nil {
 					logger.Errorw("Failed to start Singularity blob store", "err", err)
