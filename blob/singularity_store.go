@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/big"
 	"os"
 	"path"
 	"strconv"
@@ -15,9 +16,12 @@ import (
 	"github.com/data-preservation-programs/singularity/client"
 	"github.com/data-preservation-programs/singularity/handler/dataset"
 	"github.com/data-preservation-programs/singularity/handler/datasource"
+	"github.com/data-preservation-programs/singularity/handler/deal/schedule"
 	wallethandler "github.com/data-preservation-programs/singularity/handler/wallet"
 	"github.com/data-preservation-programs/singularity/model"
 	"github.com/data-preservation-programs/singularity/service/epochutil"
+	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/motion/replicationconfig"
 	"github.com/filecoin-project/motion/wallet"
 )
 
@@ -33,14 +37,16 @@ type SingularityStore struct {
 	toPack            chan uint64
 	closing           chan struct{}
 	closed            chan struct{}
+	replicationConfig *replicationconfig.ReplicationConfig
 }
 
-func NewSingularityStore(dir string, wallet *wallet.Wallet, singularityClient client.Client) *SingularityStore {
+func NewSingularityStore(dir string, wallet *wallet.Wallet, replicationConfig *replicationconfig.ReplicationConfig, singularityClient client.Client) *SingularityStore {
 	local := NewLocalStore(dir)
 	return &SingularityStore{
 		local:             local,
 		wallet:            wallet,
 		singularityClient: singularityClient,
+		replicationConfig: replicationConfig,
 		toPack:            make(chan uint64, 16),
 		closing:           make(chan struct{}),
 		closed:            make(chan struct{}),
@@ -85,11 +91,11 @@ func (l *SingularityStore) Start(ctx context.Context) error {
 		l.sourceID = source.ID
 	}
 	// get default wallet encoded private key
-	address, err := l.wallet.GetDefault()
+	walletAddr, err := l.wallet.GetDefault()
 	if err != nil {
 		return err
 	}
-	ki, err := l.wallet.WalletExport(ctx, address)
+	ki, err := l.wallet.WalletExport(ctx, walletAddr)
 	if err != nil {
 		return err
 	}
@@ -139,6 +145,40 @@ func (l *SingularityStore) Start(ctx context.Context) error {
 		_, err := l.singularityClient.AddWalletToDataset(ctx, motionDatasetName, wallet.Address)
 		if err != nil {
 			return err
+		}
+	}
+	// insure schedules are created
+	// TODO: handle config changes for replication -- singularity currently has no modify schedule endpoint
+	schedules, err := l.singularityClient.ListSchedulesByDataset(ctx, motionDatasetName)
+	if err != nil {
+		return err
+	}
+	pricePerGBEpoch, _ := (new(big.Rat).SetFrac(l.replicationConfig.PricePerGiBEpoch.Int, big.NewInt(int64(1e18)))).Float64()
+	pricePerGB, _ := (new(big.Rat).SetFrac(l.replicationConfig.PricePerGiB.Int, big.NewInt(int64(1e18)))).Float64()
+	pricePerDeal, _ := (new(big.Rat).SetFrac(l.replicationConfig.PricePerDeal.Int, big.NewInt(int64(1e18)))).Float64()
+
+	for _, sp := range l.replicationConfig.StorageProviders {
+		var foundSchedule bool
+		for _, schedule := range schedules {
+			scheduleAddr, err := address.NewFromString(schedule.Provider)
+			if err == nil && sp == scheduleAddr {
+				foundSchedule = true
+				break
+			}
+		}
+		if !foundSchedule {
+			_, err := l.singularityClient.CreateSchedule(ctx, schedule.CreateRequest{
+				DatasetName:     motionDatasetName,
+				Provider:        sp.String(),
+				PricePerGBEpoch: pricePerGBEpoch,
+				PricePerGB:      pricePerGB,
+				PricePerDeal:    pricePerDeal,
+				StartDelay:      strconv.Itoa(int(l.replicationConfig.DealStartDelay)*30) + "s",
+				Duration:        strconv.Itoa(int(l.replicationConfig.DealDuration)*30) + "s",
+			})
+			if err != nil {
+				return err
+			}
 		}
 	}
 	go l.runPreparationJobs()
