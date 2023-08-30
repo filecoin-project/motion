@@ -103,6 +103,9 @@ func (l *SingularityStore) Start(ctx context.Context) error {
 
 	// insure default wallet is imported to singularity
 	wallets, err := l.singularityClient.ListWallets(ctx)
+	if err != nil {
+		return err
+	}
 	var wallet *model.Wallet
 	for _, existing := range wallets {
 		if wallet.PrivateKey == pk {
@@ -122,6 +125,9 @@ func (l *SingularityStore) Start(ctx context.Context) error {
 
 	// insure wallet is assigned to dataset
 	wallets, err = l.singularityClient.ListWalletsByDataset(ctx, motionDatasetName)
+	if err != nil {
+		return nil
+	}
 	walletFound := false
 	for _, existing := range wallets {
 		if existing.Address == wallet.Address {
