@@ -1,0 +1,75 @@
+name: Integration Test
+
+on:
+  pull_request:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Boost Devnet
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Setup Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: stable
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      - name: Cache Filecoin Proof Parameters
+        uses: actions/cache@v3
+        env:
+          cache-name: cache-fil-proof-params
+        with:
+          path: ./integration/test/devnet/data/proofs
+          key: ${{ runner.os }}-build-${{ env.cache-name }}
+          restore-keys: |
+            ${{ runner.os }}-build-${{ env.cache-name }}-
+            ${{ runner.os }}-build-
+            ${{ runner.os }}-
+      - name: Run Boost Devnet from pre-built images
+        run: |
+          cd integration/test/devnet
+          docker compose up -d
+      - name: Await Lotus full node startup
+        run: |
+          cd integration/test/devnet
+          docker compose exec lotus lotus wait-api --timeout=10m
+      - name: Set up Motion Wallet and API endpoints
+        run: |
+          cd integration/test/devnet
+          # Setup Lotus API token
+          export `docker compose exec lotus lotus auth api-info --perm=admin`
+          IFS=: read -r token path <<< "${FULLNODE_API_INFO}"
+          echo "LOTUS_TOKEN=${token}" >> $GITHUB_ENV
+          
+          # Setup Motion Wallet
+          MOTION_WALLET_ADDR=`docker compose exec lotus lotus wallet new`
+          MOTION_WALLET_KEY=`docker compose exec lotus lotus wallet export ${MOTION_WALLET_ADDR}`
+          LOTUS_WALLET_DEFAULT_ADDR=`docker compose exec lotus lotus wallet default`
+          docker compose exec lotus lotus send --from=${LOTUS_WALLET_DEFAULT_ADDR} ${MOTION_WALLET_ADDR} 10
+          echo "MOTION_WALLET_ADDR=${MOTION_WALLET_ADDR}" >> $GITHUB_ENV
+          echo "MOTION_WALLET_KEY=${MOTION_WALLET_KEY}" >> $GITHUB_ENV
+          echo "MOTION_STORAGE_PROVIDERS=t01000" >> $GITHUB_ENV
+          echo "MOTION_API_ENDPOINT=http://localhost:40080" >> $GITHUB_ENV
+          echo "SINGULARITY_API_ENDPOINT=http://localhost:9091" >> $GITHUB_ENV
+      - name: Run Motionlarity
+        run: |
+          cd integration/test/motionlarity
+          docker compose up -d
+      - name: Wait until motion is running
+        uses: nick-fields/retry@v2
+        with:
+          timeout_seconds: 5
+          max_attempts: 10
+          retry_on: error
+          command: |
+            cd integration/test/motionlarity
+            docker compose ps --services --filter "status=running" | grep motion
+      - name: Run tests
+        env:
+          MOTION_INTEGRATION_TEST: 'true'
+        run: go test ./integration/test -v
