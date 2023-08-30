@@ -19,8 +19,10 @@ services:
       - 5432:5432
 
   singularity_api:
-    image: ghcr.io/data-preservation-programs/singularity:main
+    image: ghcr.io/data-preservation-programs/singularity:${SINGULARITY_TAG}
     command: run api --bind :9090
+    volumes:
+      - motion-singularity-volume:/usr/src/app/storage
     ports:
       - 9090:9090
     environment:
@@ -30,7 +32,9 @@ services:
         condition: service_healthy
 
   singularity_dataset_worker:
-    image: ghcr.io/data-preservation-programs/singularity:main
+    image: ghcr.io/data-preservation-programs/singularity:${SINGULARITY_TAG}
+    volumes:
+      - motion-singularity-volume:/usr/src/app/storage
     command: run dataset-worker
     environment:
       DATABASE_CONNECTION_STRING: postgres://${SINGULARITY_DB_USER:-postgres}:${SINGULARITY_DB_PASSWORD:-postgres}@db:5432/${SINGULARITY_DB_NAME:-singularity}
@@ -58,13 +62,15 @@ services:
 
   motion:
     image: ghcr.io/filecoin-project/motion:main
-    entrypoint: motion --experimentalSingularityStore --experimentalRemoteSingularityAPIUrl=http://singularity_api:9090/api
+    entrypoint: motion --experimentalSingularityStore --experimentalRemoteSingularityAPIUrl=http://singularity_api:9090
     ports:
       - 40080:40080
     environment:
       - MOTION_STORE_DIR=/usr/src/app/storage
     volumes:
       - motion-singularity-volume:/usr/src/app/storage
+    depends_on:
+      - singularity_api
 
 volumes:
   motion-singularity-volume:
