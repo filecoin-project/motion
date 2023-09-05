@@ -16,19 +16,22 @@ type (
 	// Option represents a configurable parameter in Motion service.
 	Option  func(*options) error
 	options struct {
-		wallet            *wallet.Wallet
-		storeDir          string
-		storageProviders  []address.Address
-		replicationFactor uint
-		pricePerGiBEpoch  abi.TokenAmount
-		pricePerGiB       abi.TokenAmount
-		pricePerDeal      abi.TokenAmount
-		dealStartDelay    abi.ChainEpoch
-		dealDuration      abi.ChainEpoch
-		maxCarSize        string
-		packThreshold     int64
-		datasetName       string
-		singularityClient client.Client
+		wallet              *wallet.Wallet
+		storeDir            string
+		storageProviders    []address.Address
+		replicationFactor   uint
+		pricePerGiBEpoch    abi.TokenAmount
+		pricePerGiB         abi.TokenAmount
+		pricePerDeal        abi.TokenAmount
+		dealStartDelay      abi.ChainEpoch
+		dealDuration        abi.ChainEpoch
+		maxCarSize          string
+		packThreshold       int64
+		datasetName         string
+		singularityClient   client.Client
+		scheduleUrlTemplate string
+		scheduleDealNumber  int
+		scheduleCron        string
 	}
 )
 
@@ -178,6 +181,33 @@ func WithDatasetName(n string) Option {
 func WithSingularityClient(c client.Client) Option {
 	return func(o *options) error {
 		o.singularityClient = c
+		return nil
+	}
+}
+
+// WithScheduleUrlTemplate sets the Singularity schedule URL template for online deals.
+// Defaults to offline deals.
+func WithScheduleUrlTemplate(t string) Option {
+	return func(o *options) error {
+		o.scheduleUrlTemplate = t
+		return nil
+	}
+}
+
+// WithScheduleDealNumber sets the max number of deals per singularity scheduled time.
+// Defaults to unlimited.
+func WithScheduleDealNumber(n int) Option {
+	return func(o *options) error {
+		o.scheduleDealNumber = n
+		return nil
+	}
+}
+
+// WithScheduleCron sets the Singularity schedule cron.
+// Defaults to disabled.
+func WithScheduleCron(c string) Option {
+	return func(o *options) error {
+		o.scheduleCron = c
 		return nil
 	}
 }

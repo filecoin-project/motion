@@ -168,13 +168,17 @@ func (l *SingularityStore) Start(ctx context.Context) error {
 		}
 		if !foundSchedule {
 			_, err := l.singularityClient.CreateSchedule(ctx, schedule.CreateRequest{
-				DatasetName:     l.datasetName,
-				Provider:        sp.String(),
-				PricePerGBEpoch: pricePerGBEpoch,
-				PricePerGB:      pricePerGB,
-				PricePerDeal:    pricePerDeal,
-				StartDelay:      strconv.Itoa(int(l.dealStartDelay)*builtin.EpochDurationSeconds) + "s",
-				Duration:        strconv.Itoa(int(l.dealDuration)*builtin.EpochDurationSeconds) + "s",
+				DatasetName:           l.datasetName,
+				Provider:              sp.String(),
+				PricePerGBEpoch:       pricePerGBEpoch,
+				PricePerGB:            pricePerGB,
+				PricePerDeal:          pricePerDeal,
+				StartDelay:            strconv.Itoa(int(l.dealStartDelay)*builtin.EpochDurationSeconds) + "s",
+				Duration:              strconv.Itoa(int(l.dealDuration)*builtin.EpochDurationSeconds) + "s",
+				ScheduleCron:          l.scheduleCron,
+				ScheduleDealNumber:    l.scheduleDealNumber,
+				ScheduleCronPerpetual: true,
+				URLTemplate:           l.scheduleUrlTemplate,
 			})
 			if err != nil {
 				return err
