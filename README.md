@@ -19,6 +19,9 @@ GLOBAL OPTIONS:
    --dealDuration value                                                         The duration of deals made on Filecoin (default: One year (356 days))
    --dealStartDelay value                                                       The deal start epoch delay. (default: 72 hours)
    --experimentalRemoteSingularityAPIUrl value                                  When using a singularity as the storage engine, if set, uses a remote HTTP API to interface with Singularity (default: use singularity as a code library)
+   --experimentalSingularityContentURLTemplate value                            When using a singularity as the storage engine, if set, setups up online deals to use the given url template for making online deals (default: make offline deals)
+   --experimentalSingularityScheduleCron value                                  When using a singularity as the storage engine, if set, setups up the cron schedule to send out batch deals. (default: disabled)
+   --experimentalSingularityScheduleDealNumber value                            When using a singularity as the storage engine, if set, setups up the max deal number per triggered schedule. (default: unlimited)
    --experimentalSingularityStore                                               Whether to use experimental Singularity store as the storage and deal making engine (default: Local storage is used)
    --help, -h                                                                   show help
    --localWalletDir value                                                       The path to the local wallet directory. (default: Defaults to '<user-home-directory>/.motion/wallet' with wallet key auto-generated if not present. Note that the directory permissions must be at most 0600.) [$MOTION_LOCAL_WALLET_DIR]

@@ -124,6 +124,21 @@ func main() {
 				DefaultText: "17,179,869,184 (i.e. 16 GiB)",
 				Value:       16 << 30,
 			},
+			&cli.StringFlag{
+				Name:        "experimentalSingularityContentURLTemplate",
+				Usage:       "When using a singularity as the storage engine, if set, setups up online deals to use the given url template for making online deals",
+				DefaultText: "make offline deals",
+			},
+			&cli.StringFlag{
+				Name:        "experimentalSingularityScheduleCron",
+				Usage:       "When using a singularity as the storage engine, if set, setups up the cron schedule to send out batch deals.",
+				DefaultText: "disabled",
+			},
+			&cli.IntFlag{
+				Name:        "experimentalSingularityScheduleDealNumber",
+				Usage:       "When using a singularity as the storage engine, if set, setups up the max deal number per triggered schedule.",
+				DefaultText: "unlimited",
+			},
 		},
 		Action: func(cctx *cli.Context) error {
 			storeDir := cctx.String("storeDir")
@@ -143,7 +158,6 @@ func main() {
 					logger.Errorw("Failed to instantiate local wallet", "err", err)
 					return err
 				}
-
 				singularityAPIUrl := cctx.String("experimentalRemoteSingularityAPIUrl")
 				// Instantiate Singularity client depending on specified flags.
 				var singClient client.Client
@@ -193,6 +207,9 @@ func main() {
 					singularity.WithWallet(wlt),
 					singularity.WithMaxCarSize(cctx.String("singularityMaxCarSize")),
 					singularity.WithPackThreshold(cctx.Int64("singularityPackThreshold")),
+					singularity.WithScheduleUrlTemplate(cctx.String("experimentalSingularityContentURLTemplate")),
+					singularity.WithScheduleCron(cctx.String("experimentalSingularityScheduleCron")),
+					singularity.WithScheduleDealNumber(cctx.Int("experimentalSingularityScheduleDealNumber")),
 				)
 				if err != nil {
 					logger.Errorw("Failed to instantiate singularity store", "err", err)
