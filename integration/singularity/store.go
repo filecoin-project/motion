@@ -30,12 +30,11 @@ var logger = log.Logger("motion/integration/singularity")
 
 type SingularityStore struct {
 	*options
-	local             *blob.LocalStore
-	sourceID          uint32
-	singularityClient client.Client
-	toPack            chan uint64
-	closing           chan struct{}
-	closed            chan struct{}
+	local    *blob.LocalStore
+	sourceID uint32
+	toPack   chan uint64
+	closing  chan struct{}
+	closed   chan struct{}
 }
 
 func NewStore(o ...Option) (*SingularityStore, error) {
