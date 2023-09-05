@@ -5,18 +5,14 @@ import (
 
 	"github.com/filecoin-project/motion/api/server"
 	"github.com/filecoin-project/motion/blob"
-	"github.com/filecoin-project/motion/replicationconfig"
-	"github.com/filecoin-project/motion/wallet"
 )
 
 type (
 	// Option represents a configurable parameter in Motion service.
 	Option  func(*options) error
 	options struct {
-		serverOptions     []server.Option
-		blobStore         blob.Store
-		wallet            *wallet.Wallet
-		replicationConfig *replicationconfig.ReplicationConfig
+		serverOptions []server.Option
+		blobStore     blob.Store
 	}
 )
 
@@ -50,24 +46,6 @@ func WithServerOptions(serverOptions ...server.Option) Option {
 func WithBlobStore(s blob.Store) Option {
 	return func(o *options) error {
 		o.blobStore = s
-		return nil
-	}
-}
-
-// WithWallet sets the wallet used by Motion to interact with Filecoin network.
-// Defaults to wallet.New.
-func WithWallet(w *wallet.Wallet) Option {
-	return func(o *options) error {
-		o.wallet = w
-		return nil
-	}
-}
-
-// WithWallet sets the wallet used by Motion to interact with Filecoin network.
-// Defaults to wallet.New.
-func WithReplicationConfig(rc *replicationconfig.ReplicationConfig) Option {
-	return func(o *options) error {
-		o.replicationConfig = rc
 		return nil
 	}
 }

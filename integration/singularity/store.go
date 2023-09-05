@@ -1,4 +1,4 @@
-package blob
+package singularity
 
 import (
 	"context"
@@ -21,42 +21,42 @@ import (
 	"github.com/data-preservation-programs/singularity/model"
 	"github.com/data-preservation-programs/singularity/service/epochutil"
 	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/motion/replicationconfig"
-	"github.com/filecoin-project/motion/wallet"
+	"github.com/filecoin-project/go-state-types/builtin"
+	"github.com/filecoin-project/motion/blob"
+	"github.com/ipfs/go-log/v2"
 )
 
-const motionDatasetName = "MOTION_DATASET"
-const maxCarSize = "31.5GiB"
-const packThreshold = 1 << 34
+var logger = log.Logger("motion/integration/singularity")
 
 type SingularityStore struct {
-	local             *LocalStore
+	*options
+	local             *blob.LocalStore
 	sourceID          uint32
-	wallet            *wallet.Wallet
 	singularityClient client.Client
 	toPack            chan uint64
 	closing           chan struct{}
 	closed            chan struct{}
-	replicationConfig *replicationconfig.ReplicationConfig
 }
 
-func NewSingularityStore(dir string, wallet *wallet.Wallet, replicationConfig *replicationconfig.ReplicationConfig, singularityClient client.Client) *SingularityStore {
-	local := NewLocalStore(dir)
-	return &SingularityStore{
-		local:             local,
-		wallet:            wallet,
-		singularityClient: singularityClient,
-		replicationConfig: replicationConfig,
-		toPack:            make(chan uint64, 16),
-		closing:           make(chan struct{}),
-		closed:            make(chan struct{}),
+func NewStore(o ...Option) (*SingularityStore, error) {
+	opts, err := newOptions(o...)
+	if err != nil {
+		logger.Errorw("Failed to instantiate options", "err", err)
+		return nil, err
 	}
+	return &SingularityStore{
+		options: opts,
+		local:   blob.NewLocalStore(opts.storeDir),
+		toPack:  make(chan uint64, 16),
+		closing: make(chan struct{}),
+		closed:  make(chan struct{}),
+	}, nil
 }
 
 func (l *SingularityStore) Start(ctx context.Context) error {
 	_, err := l.singularityClient.CreateDataset(ctx, dataset.CreateRequest{
-		Name:       motionDatasetName,
-		MaxSizeStr: maxCarSize,
+		Name:       l.datasetName,
+		MaxSizeStr: l.maxCarSize,
 	})
 	var asDuplicatedRecord client.DuplicateRecordError
 
@@ -66,21 +66,21 @@ func (l *SingularityStore) Start(ctx context.Context) error {
 	}
 
 	// find or create the motion datasource
-	sources, err := l.singularityClient.ListSourcesByDataset(ctx, motionDatasetName)
+	sources, err := l.singularityClient.ListSourcesByDataset(ctx, l.datasetName)
 	if err != nil {
 		return err
 	}
 	found := false
 	for _, source := range sources {
-		if source.Type == "local" && source.Path == strings.TrimSuffix(l.local.dir, "/") {
+		if source.Type == "local" && source.Path == strings.TrimSuffix(l.local.Dir(), "/") {
 			l.sourceID = source.ID
 			found = true
 			break
 		}
 	}
 	if !found {
-		source, err := l.singularityClient.CreateLocalSource(ctx, motionDatasetName, datasource.LocalRequest{
-			SourcePath:        l.local.dir,
+		source, err := l.singularityClient.CreateLocalSource(ctx, l.datasetName, datasource.LocalRequest{
+			SourcePath:        l.local.Dir(),
 			RescanInterval:    "0",
 			DeleteAfterExport: false,
 			ScanningState:     model.Created,
@@ -112,15 +112,15 @@ func (l *SingularityStore) Start(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	var wallet *model.Wallet
+	var wlt *model.Wallet
 	for _, existing := range wallets {
-		if wallet.PrivateKey == pk {
-			wallet = &existing
+		if existing.PrivateKey == pk {
+			wlt = &existing
 			break
 		}
 	}
-	if wallet == nil {
-		wallet, err = l.singularityClient.ImportWallet(ctx, wallethandler.ImportRequest{
+	if wlt == nil {
+		wlt, err = l.singularityClient.ImportWallet(ctx, wallethandler.ImportRequest{
 			PrivateKey: pk,
 		})
 
@@ -130,37 +130,37 @@ func (l *SingularityStore) Start(ctx context.Context) error {
 	}
 
 	// insure wallet is assigned to dataset
-	wallets, err = l.singularityClient.ListWalletsByDataset(ctx, motionDatasetName)
+	wallets, err = l.singularityClient.ListWalletsByDataset(ctx, l.datasetName)
 	if err != nil {
 		return nil
 	}
 	walletFound := false
 	for _, existing := range wallets {
-		if existing.Address == wallet.Address {
+		if existing.Address == wlt.Address {
 			walletFound = true
 			break
 		}
 	}
 	if !walletFound {
-		_, err := l.singularityClient.AddWalletToDataset(ctx, motionDatasetName, wallet.Address)
+		_, err := l.singularityClient.AddWalletToDataset(ctx, l.datasetName, wlt.Address)
 		if err != nil {
 			return err
 		}
 	}
 	// insure schedules are created
 	// TODO: handle config changes for replication -- singularity currently has no modify schedule endpoint
-	schedules, err := l.singularityClient.ListSchedulesByDataset(ctx, motionDatasetName)
+	schedules, err := l.singularityClient.ListSchedulesByDataset(ctx, l.datasetName)
 	if err != nil {
 		return err
 	}
-	pricePerGBEpoch, _ := (new(big.Rat).SetFrac(l.replicationConfig.PricePerGiBEpoch.Int, big.NewInt(int64(1e18)))).Float64()
-	pricePerGB, _ := (new(big.Rat).SetFrac(l.replicationConfig.PricePerGiB.Int, big.NewInt(int64(1e18)))).Float64()
-	pricePerDeal, _ := (new(big.Rat).SetFrac(l.replicationConfig.PricePerDeal.Int, big.NewInt(int64(1e18)))).Float64()
+	pricePerGBEpoch, _ := (new(big.Rat).SetFrac(l.pricePerGiBEpoch.Int, big.NewInt(int64(1e18)))).Float64()
+	pricePerGB, _ := (new(big.Rat).SetFrac(l.pricePerGiB.Int, big.NewInt(int64(1e18)))).Float64()
+	pricePerDeal, _ := (new(big.Rat).SetFrac(l.pricePerDeal.Int, big.NewInt(int64(1e18)))).Float64()
 
-	for _, sp := range l.replicationConfig.StorageProviders {
+	for _, sp := range l.storageProviders {
 		var foundSchedule bool
-		for _, schedule := range schedules {
-			scheduleAddr, err := address.NewFromString(schedule.Provider)
+		for _, schd := range schedules {
+			scheduleAddr, err := address.NewFromString(schd.Provider)
 			if err == nil && sp == scheduleAddr {
 				foundSchedule = true
 				break
@@ -168,13 +168,13 @@ func (l *SingularityStore) Start(ctx context.Context) error {
 		}
 		if !foundSchedule {
 			_, err := l.singularityClient.CreateSchedule(ctx, schedule.CreateRequest{
-				DatasetName:     motionDatasetName,
+				DatasetName:     l.datasetName,
 				Provider:        sp.String(),
 				PricePerGBEpoch: pricePerGBEpoch,
 				PricePerGB:      pricePerGB,
 				PricePerDeal:    pricePerDeal,
-				StartDelay:      strconv.Itoa(int(l.replicationConfig.DealStartDelay)*30) + "s",
-				Duration:        strconv.Itoa(int(l.replicationConfig.DealDuration)*30) + "s",
+				StartDelay:      strconv.Itoa(int(l.dealStartDelay)*builtin.EpochDurationSeconds) + "s",
+				Duration:        strconv.Itoa(int(l.dealDuration)*builtin.EpochDurationSeconds) + "s",
 			})
 			if err != nil {
 				return err
@@ -203,7 +203,7 @@ func (l *SingularityStore) runPreparationJobs() {
 				if err != nil {
 					logger.Errorw("preparing to pack file", "fileID", fileID, "error", err)
 				}
-				if outstanding > packThreshold {
+				if outstanding > l.packThreshold {
 					// mark outstanding pack jobs as ready to go so we can make CAR files
 					err := l.singularityClient.PrepareToPackSource(ctx, l.sourceID)
 					if err != nil {
@@ -225,7 +225,7 @@ func (l *SingularityStore) Shutdown(ctx context.Context) error {
 	return nil
 }
 
-func (s *SingularityStore) Put(ctx context.Context, reader io.ReadCloser) (*Descriptor, error) {
+func (s *SingularityStore) Put(ctx context.Context, reader io.ReadCloser) (*blob.Descriptor, error) {
 	desc, err := s.local.Put(ctx, reader)
 	if err != nil {
 		return nil, err
@@ -239,7 +239,7 @@ func (s *SingularityStore) Put(ctx context.Context, reader io.ReadCloser) (*Desc
 		return nil, ctx.Err()
 	case s.toPack <- file.ID:
 	}
-	idFile, err := os.CreateTemp(s.local.dir, "motion_local_store_*.bin.temp")
+	idFile, err := os.CreateTemp(s.local.Dir(), "motion_local_store_*.bin.temp")
 	if err != nil {
 		return nil, err
 	}
@@ -249,16 +249,16 @@ func (s *SingularityStore) Put(ctx context.Context, reader io.ReadCloser) (*Desc
 		_ = os.Remove(idFile.Name())
 		return nil, err
 	}
-	if err = os.Rename(idFile.Name(), path.Join(s.local.dir, desc.ID.String()+".id")); err != nil {
+	if err = os.Rename(idFile.Name(), path.Join(s.local.Dir(), desc.ID.String()+".id")); err != nil {
 		return nil, err
 	}
 	return desc, nil
 }
 
-func (s *SingularityStore) Get(ctx context.Context, id ID) (io.ReadSeekCloser, error) {
+func (s *SingularityStore) Get(ctx context.Context, id blob.ID) (io.ReadSeekCloser, error) {
 	// this is largely artificial -- we're verifying the singularity item, but just reading from
 	// the local store
-	idStream, err := os.Open(path.Join(s.local.dir, id.String()+".id"))
+	idStream, err := os.Open(path.Join(s.local.Dir(), id.String()+".id"))
 	if err != nil {
 		return nil, err
 	}
@@ -273,12 +273,12 @@ func (s *SingularityStore) Get(ctx context.Context, id ID) (io.ReadSeekCloser, e
 	item, err := s.singularityClient.GetFile(ctx, itemID)
 	var asNotFoundError client.NotFoundError
 	if errors.As(err, &asNotFoundError) {
-		return nil, ErrBlobNotFound
+		return nil, blob.ErrBlobNotFound
 	}
 	if err != nil {
 		return nil, fmt.Errorf("error loading singularity entry: %w", err)
 	}
-	var decoded ID
+	var decoded blob.ID
 	err = decoded.Decode(strings.TrimSuffix(path.Base(item.Path), path.Ext(item.Path)))
 	if err != nil {
 		return nil, err
@@ -286,10 +286,10 @@ func (s *SingularityStore) Get(ctx context.Context, id ID) (io.ReadSeekCloser, e
 	return s.local.Get(ctx, decoded)
 }
 
-func (s *SingularityStore) Describe(ctx context.Context, id ID) (*Descriptor, error) {
+func (s *SingularityStore) Describe(ctx context.Context, id blob.ID) (*blob.Descriptor, error) {
 	// this is largely artificial -- we're verifying the singularity item, but just reading from
 	// the local store
-	idStream, err := os.Open(path.Join(s.local.dir, id.String()+".id"))
+	idStream, err := os.Open(path.Join(s.local.Dir(), id.String()+".id"))
 	if err != nil {
 		return nil, err
 	}
@@ -304,12 +304,12 @@ func (s *SingularityStore) Describe(ctx context.Context, id ID) (*Descriptor, er
 	item, err := s.singularityClient.GetFile(ctx, itemID)
 	var asNotFoundError client.NotFoundError
 	if errors.As(err, &asNotFoundError) {
-		return nil, ErrBlobNotFound
+		return nil, blob.ErrBlobNotFound
 	}
 	if err != nil {
 		return nil, fmt.Errorf("error loading singularity entry: %w", err)
 	}
-	var decoded ID
+	var decoded blob.ID
 	err = decoded.Decode(strings.TrimSuffix(path.Base(item.Path), path.Ext(item.Path)))
 	if err != nil {
 		return nil, err
@@ -322,16 +322,16 @@ func (s *SingularityStore) Describe(ctx context.Context, id ID) (*Descriptor, er
 	if err != nil {
 		return nil, err
 	}
-	replicas := make([]Replica, 0, len(deals))
+	replicas := make([]blob.Replica, 0, len(deals))
 	for _, deal := range deals {
-		replicas = append(replicas, Replica{
+		replicas = append(replicas, blob.Replica{
 			// TODO: figure out how to get LastVerified
 			Provider:   deal.Provider,
 			Status:     string(deal.State),
 			Expiration: epochutil.EpochToTime(deal.EndEpoch),
 		})
 	}
-	descriptor.Status = &Status{
+	descriptor.Status = &blob.Status{
 		Replicas: replicas,
 	}
 	return descriptor, nil

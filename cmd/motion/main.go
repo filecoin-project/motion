@@ -19,7 +19,7 @@ import (
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/motion"
 	"github.com/filecoin-project/motion/blob"
-	"github.com/filecoin-project/motion/replicationconfig"
+	"github.com/filecoin-project/motion/integration/singularity"
 	"github.com/filecoin-project/motion/wallet"
 	"github.com/ipfs/go-log/v2"
 	"github.com/urfave/cli/v2"
@@ -113,73 +113,91 @@ func main() {
 				DefaultText: "One year (356 days)",
 				Value:       356 * 24 * time.Hour,
 			},
+			&cli.StringFlag{
+				Name:  "singularityMaxCarSize",
+				Usage: "The maximum Singularity generated CAR size",
+				Value: "31.5GiB",
+			},
+			&cli.Int64Flag{
+				Name:        "singularityPackThreshold",
+				Usage:       "The Singularity store pack threshold in number of bytes",
+				DefaultText: "17,179,869,184 (i.e. 16 GiB)",
+				Value:       16 << 30,
+			},
 		},
 		Action: func(cctx *cli.Context) error {
-
-			localWalletDir := cctx.String("localWalletDir")
-			localWalletGenIfNotExist := cctx.Bool("localWalletGenerateIfNotExist")
-			ks, err := wallet.DefaultDiskKeyStoreOpener(localWalletDir, localWalletGenIfNotExist)()
-			if err != nil {
-				logger.Errorw("Failed to instantiate local wallet keystore", "err", err)
-				return err
-			}
-			wallet, err := wallet.New(
-				wallet.WithKeyStoreOpener(func() (types.KeyStore, error) { return ks, nil }),
-				wallet.WithGenerateKeyIfNotExist(localWalletGenIfNotExist))
-			if err != nil {
-				logger.Errorw("Failed to instantiate local wallet", "err", err)
-				return err
-			}
-			// Parse any configured storage povider addresses.
-			sps := cctx.StringSlice("storageProvider")
-			spAddrs := make([]address.Address, 0, len(sps))
-			for _, sp := range sps {
-				spAddr, err := address.NewFromString(sp)
-				if err != nil {
-					return fmt.Errorf("storage provider '%s' is not a valid address: %w", sp, err)
-				}
-				spAddrs = append(spAddrs, spAddr)
-			}
-			replicationConfig, err := replicationconfig.NewReplicationConfig(
-				replicationconfig.WithStorageProviders(spAddrs...),
-				replicationconfig.WithReplicationFactor(cctx.Uint("replicationFactor")),
-				replicationconfig.WithPricePerGiBEpoch(attoFilToTokenAmount(cctx.Float64("pricePerGiBEpoch"))),
-				replicationconfig.WithPricePerGiB(attoFilToTokenAmount(cctx.Float64("pricePerGiB"))),
-				replicationconfig.WithPricePerDeal(attoFilToTokenAmount(cctx.Float64("pricePerDeal"))),
-				replicationconfig.WithDealStartDelay(durationToFilecoinEpoch(cctx.Duration("dealStartDelay"))),
-				replicationconfig.WithDealDuration(durationToFilecoinEpoch(cctx.Duration("dealDuration"))),
-			)
-			if err != nil {
-				return fmt.Errorf("error initializing replication config: %w", err)
-			}
 			storeDir := cctx.String("storeDir")
 			var store blob.Store
-			lotusAPI := cctx.String("lotusApi")
-			lotusToken := cctx.String("lotusToken")
 			if cctx.Bool("experimentalSingularityStore") {
+				localWalletDir := cctx.String("localWalletDir")
+				localWalletGenIfNotExist := cctx.Bool("localWalletGenerateIfNotExist")
+				ks, err := wallet.DefaultDiskKeyStoreOpener(localWalletDir, localWalletGenIfNotExist)()
+				if err != nil {
+					logger.Errorw("Failed to instantiate local wallet keystore", "err", err)
+					return err
+				}
+				wlt, err := wallet.New(
+					wallet.WithKeyStoreOpener(func() (types.KeyStore, error) { return ks, nil }),
+					wallet.WithGenerateKeyIfNotExist(localWalletGenIfNotExist))
+				if err != nil {
+					logger.Errorw("Failed to instantiate local wallet", "err", err)
+					return err
+				}
+
 				singularityAPIUrl := cctx.String("experimentalRemoteSingularityAPIUrl")
-				var client client.Client
+				// Instantiate Singularity client depending on specified flags.
+				var singClient client.Client
 				if singularityAPIUrl != "" {
-					client = httpclient.NewHTTPClient(http.DefaultClient, singularityAPIUrl)
+					singClient = httpclient.NewHTTPClient(http.DefaultClient, singularityAPIUrl)
 				} else {
+					lotusAPI := cctx.String("lotusApi")
+					lotusToken := cctx.String("lotusToken")
 					db, closer, err := database.OpenWithLogger("sqlite:" + storeDir + "/singularity.db")
-					defer closer.Close()
 					if err != nil {
 						logger.Errorw("Failed to open singularity database", "err", err)
 						return err
 					}
-					err = epochutil.Initialize(cctx.Context, lotusAPI, lotusToken)
-					if err != nil {
+					defer closer.Close()
+
+					if err := epochutil.Initialize(cctx.Context, lotusAPI, lotusToken); err != nil {
 						logger.Errorw("Failed to initialized epoch timing", "err", err)
 						return err
 					}
-					client, err = libclient.NewClient(db, jsonrpc.NewClient(lotusAPI))
+					singClient, err = libclient.NewClient(db, jsonrpc.NewClient(lotusAPI))
 					if err != nil {
 						logger.Errorw("Failed to get singularity client", "err", err)
 						return err
 					}
 				}
-				singularityStore := blob.NewSingularityStore(storeDir, wallet, replicationConfig, client)
+
+				// Parse any configured storage provider addresses.
+				sps := cctx.StringSlice("storageProvider")
+				spAddrs := make([]address.Address, 0, len(sps))
+				for _, sp := range sps {
+					spAddr, err := address.NewFromString(sp)
+					if err != nil {
+						return fmt.Errorf("storage provider '%s' is not a valid address: %w", sp, err)
+					}
+					spAddrs = append(spAddrs, spAddr)
+				}
+				singularityStore, err := singularity.NewStore(
+					singularity.WithStoreDir(cctx.String("storeDir")),
+					singularity.WithStorageProviders(spAddrs...),
+					singularity.WithReplicationFactor(cctx.Uint("replicationFactor")),
+					singularity.WithPricePerGiBEpoch(attoFilToTokenAmount(cctx.Float64("pricePerGiBEpoch"))),
+					singularity.WithPricePerGiB(attoFilToTokenAmount(cctx.Float64("pricePerGiB"))),
+					singularity.WithPricePerDeal(attoFilToTokenAmount(cctx.Float64("pricePerDeal"))),
+					singularity.WithDealStartDelay(durationToFilecoinEpoch(cctx.Duration("dealStartDelay"))),
+					singularity.WithDealDuration(durationToFilecoinEpoch(cctx.Duration("dealDuration"))),
+					singularity.WithSingularityClient(singClient),
+					singularity.WithWallet(wlt),
+					singularity.WithMaxCarSize(cctx.String("singularityMaxCarSize")),
+					singularity.WithPackThreshold(cctx.Int64("singularityPackThreshold")),
+				)
+				if err != nil {
+					logger.Errorw("Failed to instantiate singularity store", "err", err)
+					return err
+				}
 				logger.Infow("Using Singularity blob store", "storeDir", storeDir)
 				if err := singularityStore.Start(cctx.Context); err != nil {
 					logger.Errorw("Failed to start Singularity blob store", "err", err)
@@ -191,11 +209,7 @@ func main() {
 				logger.Infow("Using local blob store", "storeDir", storeDir)
 			}
 
-			m, err := motion.New(
-				motion.WithBlobStore(store),
-				motion.WithWallet(wallet),
-				motion.WithReplicationConfig(replicationConfig),
-			)
+			m, err := motion.New(motion.WithBlobStore(store))
 			if err != nil {
 				logger.Fatalw("Failed to instantiate Motion", "err", err)
 			}
