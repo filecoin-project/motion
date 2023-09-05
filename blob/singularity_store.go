@@ -128,7 +128,7 @@ func (l *SingularityStore) Start(ctx context.Context) error {
 	}
 	var wallet *model.Wallet
 	for _, existing := range wallets {
-		if wallet.PrivateKey == pk {
+		if existing.PrivateKey == pk {
 			wallet = &existing
 			break
 		}
