@@ -84,6 +84,11 @@ func main() {
 				Value:    "",
 				EnvVars:  []string{"LOTUS_TOKEN"},
 			},
+			&cli.BoolFlag{
+				Name:     "lotus-test",
+				Category: "Lotus",
+				EnvVars:  []string{"LOTUS_TEST"},
+			},
 			&cli.UintFlag{
 				Name:        "replicationFactor",
 				Usage:       "The number of desired replicas per blob",
@@ -115,6 +120,10 @@ func main() {
 			},
 		},
 		Action: func(cctx *cli.Context) error {
+			lotusTest := cctx.Bool("lotus-test")
+			if lotusTest {
+				address.CurrentNetwork = address.Testnet
+			}
 
 			localWalletDir := cctx.String("localWalletDir")
 			localWalletGenIfNotExist := cctx.Bool("localWalletGenerateIfNotExist")

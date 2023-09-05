@@ -26,8 +26,20 @@ import (
 )
 
 const motionDatasetName = "MOTION_DATASET"
-const maxCarSize = "31.5GiB"
-const packThreshold = 1 << 34
+
+func maxCarSize() string {
+	if address.CurrentNetwork == address.Testnet {
+		return "7.5Mib"
+	}
+	return "31.5GiB"
+}
+
+func packThreshold() int64 {
+	if address.CurrentNetwork == address.Testnet {
+		return 1 << 12
+	}
+	return 1 << 34
+}
 
 type SingularityStore struct {
 	local             *LocalStore
@@ -56,7 +68,7 @@ func NewSingularityStore(dir string, wallet *wallet.Wallet, replicationConfig *r
 func (l *SingularityStore) Start(ctx context.Context) error {
 	_, err := l.singularityClient.CreateDataset(ctx, dataset.CreateRequest{
 		Name:       motionDatasetName,
-		MaxSizeStr: maxCarSize,
+		MaxSizeStr: maxCarSize(),
 	})
 	var asDuplicatedRecord client.DuplicateRecordError
 
@@ -203,7 +215,7 @@ func (l *SingularityStore) runPreparationJobs() {
 				if err != nil {
 					logger.Errorw("preparing to pack file", "fileID", fileID, "error", err)
 				}
-				if outstanding > packThreshold {
+				if outstanding > packThreshold() {
 					// mark outstanding pack jobs as ready to go so we can make CAR files
 					err := l.singularityClient.PrepareToPackSource(ctx, l.sourceID)
 					if err != nil {
