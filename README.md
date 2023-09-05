@@ -27,6 +27,8 @@ GLOBAL OPTIONS:
    --pricePerGiB value                                                          The maximum  price per GiB in attoFIL. (default: 0)
    --pricePerGiBEpoch value                                                     The maximum price per GiB per Epoch in attoFIL. (default: 0)
    --replicationFactor value                                                    The number of desired replicas per blob (default: Number of storage providers; see 'storageProvider' flag.)
+   --singularityMaxCarSize value                                                The maximum Singularity generated CAR size (default: "31.5GiB")
+   --singularityPackThreshold value                                             The Singularity store pack threshold in number of bytes (default: 17,179,869,184 (i.e. 16 GiB))
    --storageProvider value, --sp value [ --storageProvider value, --sp value ]  Storage providers to which to make deals with. Multiple providers may be specified. (default: No deals are made to replicate data onto storage providers.)
    --storeDir value                                                             The path at which to store Motion data (default: OS Temporary directory) [$MOTION_STORE_DIR]
 

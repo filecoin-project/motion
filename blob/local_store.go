@@ -20,9 +20,15 @@ type LocalStore struct {
 // NewLocalStore instantiates a new LocalStore and uses the given dir as the place to store blobs.
 // Blobs are stored as flat files, named by their ID with .bin extension.
 func NewLocalStore(dir string) *LocalStore {
+	logger.Debugw("Instantiated local store", "dir", dir)
 	return &LocalStore{
 		dir: dir,
 	}
+}
+
+// Dir returns the local directory path used by the store.
+func (l *LocalStore) Dir() string {
+	return l.dir
 }
 
 // Put reads the given reader fully and stores its content in the store directory as flat files.

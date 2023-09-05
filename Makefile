@@ -13,9 +13,7 @@ clean:
 	rm -rf ./$(FILECOIN_FFI_HOME)
 
 extern/filecoin-ffi:
-	git clone --depth 1 https://github.com/filecoin-project/filecoin-ffi.git $(FILECOIN_FFI_HOME) && \
+	git clone --depth 1 --branch $(FILECOIN_FFI_VERSION) https://github.com/filecoin-project/filecoin-ffi.git $(FILECOIN_FFI_HOME) && \
 	cd $(FILECOIN_FFI_HOME) && \
-	git fetch origin $(FILECOIN_FFI_VERSION) && \
-	git checkout $(FILECOIN_FFI_VERSION) && \
+	git pull && \
 	$(MAKE)
-
