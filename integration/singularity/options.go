@@ -57,7 +57,7 @@ func newOptions(o ...Option) (*options, error) {
 		scheduleDealSize:      "0",
 		totalDealSize:         "0",
 		maxPendingDealSize:    "0",
-		maxPendingDealNumber:  1,
+		maxPendingDealNumber:  0,
 	}
 	for _, apply := range o {
 		if err := apply(opts); err != nil {
