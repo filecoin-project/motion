@@ -6,8 +6,10 @@ RUN apt-get update && apt-get install -y libhwloc-dev ocl-icd-opencl-dev jq
 COPY Makefile .
 RUN make extern/filecoin-ffi
 
-COPY . .
+COPY go.* .
+COPY integration/ribs/go.* integration/ribs/
 RUN go mod download
+COPY . .
 
 RUN CGO_ENABLED=1 go build -o /go/bin/motion ./cmd/motion
 
