@@ -74,6 +74,7 @@ func main() {
 				Aliases:     []string{"sp"},
 				Usage:       "Storage providers to which to make deals with. Multiple providers may be specified.",
 				DefaultText: "No deals are made to replicate data onto storage providers.",
+				EnvVars:     []string{"MOTION_STORAGE_PROVIDERS"},
 			},
 			&cli.StringFlag{
 				Name:     "lotusApi",
