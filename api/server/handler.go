@@ -153,7 +153,7 @@ func (m *HttpServer) handleBlobGetStatusByID(w http.ResponseWriter, r *http.Requ
 	}
 
 	if blobDesc.Status != nil {
-		response.Replicas = make([]api.Replica, len(blobDesc.Status.Replicas))
+		response.Replicas = make([]api.Replica, 0, len(blobDesc.Status.Replicas))
 		for _, replica := range blobDesc.Status.Replicas {
 			response.Replicas = append(response.Replicas, api.Replica{
 				Provider:     replica.Provider,
