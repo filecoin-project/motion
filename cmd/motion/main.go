@@ -64,6 +64,11 @@ func main() {
 				Usage:       "When using a singularity as the storage engine, if set, uses a remote HTTP API to interface with Singularity",
 				DefaultText: "use singularity as a code library",
 			},
+			&cli.StringFlag{
+				Name:        "experimentalSingularityContentURLTemplate",
+				Usage:       "When using a singularity as the storage engine, if set, setups up online deals to use the given url template for making online deals",
+				DefaultText: "make offline deals",
+			},
 			&cli.StringSliceFlag{
 				Name:        "storageProvider",
 				Aliases:     []string{"sp"},
@@ -188,7 +193,8 @@ func main() {
 						return err
 					}
 				}
-				singularityStore := blob.NewSingularityStore(storeDir, wallet, replicationConfig, client)
+				urlTemplate := cctx.String("experimentalSingularityContentURLTemplate")
+				singularityStore := blob.NewSingularityStore(storeDir, wallet, replicationConfig, urlTemplate, client)
 				logger.Infow("Using Singularity blob store", "storeDir", storeDir)
 				if err := singularityStore.Start(cctx.Context); err != nil {
 					logger.Errorw("Failed to start Singularity blob store", "err", err)

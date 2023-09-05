@@ -50,9 +50,10 @@ type SingularityStore struct {
 	closing           chan struct{}
 	closed            chan struct{}
 	replicationConfig *replicationconfig.ReplicationConfig
+	urlTemplate       string
 }
 
-func NewSingularityStore(dir string, wallet *wallet.Wallet, replicationConfig *replicationconfig.ReplicationConfig, singularityClient client.Client) *SingularityStore {
+func NewSingularityStore(dir string, wallet *wallet.Wallet, replicationConfig *replicationconfig.ReplicationConfig, urlTemplate string, singularityClient client.Client) *SingularityStore {
 	local := NewLocalStore(dir)
 	return &SingularityStore{
 		local:             local,
@@ -62,6 +63,7 @@ func NewSingularityStore(dir string, wallet *wallet.Wallet, replicationConfig *r
 		toPack:            make(chan uint64, 16),
 		closing:           make(chan struct{}),
 		closed:            make(chan struct{}),
+		urlTemplate:       urlTemplate,
 	}
 }
 
@@ -180,13 +182,17 @@ func (l *SingularityStore) Start(ctx context.Context) error {
 		}
 		if !foundSchedule {
 			_, err := l.singularityClient.CreateSchedule(ctx, schedule.CreateRequest{
-				DatasetName:     motionDatasetName,
-				Provider:        sp.String(),
-				PricePerGBEpoch: pricePerGBEpoch,
-				PricePerGB:      pricePerGB,
-				PricePerDeal:    pricePerDeal,
-				StartDelay:      strconv.Itoa(int(l.replicationConfig.DealStartDelay)*30) + "s",
-				Duration:        strconv.Itoa(int(l.replicationConfig.DealDuration)*30) + "s",
+				DatasetName:           motionDatasetName,
+				Provider:              sp.String(),
+				PricePerGBEpoch:       pricePerGBEpoch,
+				PricePerGB:            pricePerGB,
+				PricePerDeal:          pricePerDeal,
+				StartDelay:            strconv.Itoa(int(l.replicationConfig.DealStartDelay)*30) + "s",
+				Duration:              strconv.Itoa(int(l.replicationConfig.DealDuration)*30) + "s",
+				ScheduleCron:          "* * * * *",
+				ScheduleDealNumber:    1,
+				ScheduleCronPerpetual: true,
+				URLTemplate:           l.urlTemplate,
 			})
 			if err != nil {
 				return err
