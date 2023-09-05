@@ -5,6 +5,7 @@ services:
     extends:
       file: docker-compose.yml
       service: db
+
   singularity_api:
     extends:
       file: docker-compose.yml
@@ -12,6 +13,11 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    env_file: .env.local
+    networks:
+      - default
+      - devnet
+
   singularity_dataset_worker:
     extends:
       file: docker-compose.yml
@@ -19,17 +25,80 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    env_file: .env.local
+    networks:
+      - default
+      - devnet
+
+  singularity_deal_pusher:
+    extends:
+      file: docker-compose.yml
+      service: singularity_deal_pusher
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file: .env.local
+    networks:
+      - default
+      - devnet
+
+  singularity_deal_tracker:
+    extends:
+      file: docker-compose.yml
+      service: singularity_deal_tracker
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file: .env.local
+    networks:
+      - default
+      - devnet
+
+  singularity_content_provider:
+    extends:
+      file: docker-compose.yml
+      service: singularity_content_provider
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file: .env.local
+    networks:
+      - default
+      - devnet
+
   motion:
     build: .
-    entrypoint: motion --experimentalSingularityStore --experimentalRemoteSingularityAPIUrl=http://singularity_api:9090
+    entrypoint: motion --experimentalSingularityStore --experimentalRemoteSingularityAPIUrl=http://singularity_api:9090 --experimentalSingularityContentURLTemplate=http://singularity_content_provider:7778/piece/{PIECE_CID}
     ports:
       - 40080:40080
     environment:
       - MOTION_STORE_DIR=/usr/src/app/storage
+      - MOTION_LOCAL_WALLET_DIR=/usr/src/app/wallet
+      - LOTUS_TEST
+      - LOTUS_API
+      - LOTUS_TOKEN
+      - MOTION_STORAGE_PROVIDERS
+      - MOTION_PRICE_PER_GIB_EPOCH
+      - MOTION_PRICE_PER_GIB
+      - MOTION_PRICE_PER_DEAL
+      - MOTION_DEAL_START_DELAY
+      - MOTION_DEAL_DURATION
     volumes:
       - motion-singularity-volume:/usr/src/app/storage
+      - motion-local-wallet-volume:/usr/src/app/wallet
     depends_on:
       - singularity_api
+    networks:
+      - default
+      - devnet
 
 volumes:
   motion-singularity-volume:
+  motion-local-wallet-volume:
+
+networks:
+  default:
+    name: motion
+  devnet:
+    name: devnet
+    external: true
