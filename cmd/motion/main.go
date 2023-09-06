@@ -16,11 +16,9 @@ import (
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
 	"github.com/filecoin-project/go-state-types/builtin"
-	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/motion"
 	"github.com/filecoin-project/motion/blob"
 	"github.com/filecoin-project/motion/integration/singularity"
-	"github.com/filecoin-project/motion/wallet"
 	"github.com/ipfs/go-log/v2"
 	"github.com/urfave/cli/v2"
 	"github.com/ybbus/jsonrpc/v3"
@@ -44,15 +42,9 @@ func main() {
 				EnvVars:     []string{"MOTION_STORE_DIR"},
 			},
 			&cli.StringFlag{
-				Name:        "localWalletDir",
-				Usage:       "The path to the local wallet directory.",
-				DefaultText: "Defaults to '<user-home-directory>/.motion/wallet' with wallet key auto-generated if not present. Note that the directory permissions must be at most 0600.",
-				EnvVars:     []string{"MOTION_LOCAL_WALLET_DIR"},
-			},
-			&cli.BoolFlag{
-				Name:  "localWalletGenerateIfNotExist",
-				Usage: "Whether to generate the local wallet key if none is found",
-				Value: true,
+				Name:    "walletKey",
+				Usage:   "Hex encoded private key for the wallet to use with motion",
+				EnvVars: []string{"MOTION_WALLET_KEY"},
 			},
 			&cli.BoolFlag{
 				Name:        "experimentalSingularityStore",
@@ -160,20 +152,6 @@ func main() {
 			storeDir := cctx.String("storeDir")
 			var store blob.Store
 			if cctx.Bool("experimentalSingularityStore") {
-				localWalletDir := cctx.String("localWalletDir")
-				localWalletGenIfNotExist := cctx.Bool("localWalletGenerateIfNotExist")
-				ks, err := wallet.DefaultDiskKeyStoreOpener(localWalletDir, localWalletGenIfNotExist)()
-				if err != nil {
-					logger.Errorw("Failed to instantiate local wallet keystore", "err", err)
-					return err
-				}
-				wlt, err := wallet.New(
-					wallet.WithKeyStoreOpener(func() (types.KeyStore, error) { return ks, nil }),
-					wallet.WithGenerateKeyIfNotExist(localWalletGenIfNotExist))
-				if err != nil {
-					logger.Errorw("Failed to instantiate local wallet", "err", err)
-					return err
-				}
 				singularityAPIUrl := cctx.String("experimentalRemoteSingularityAPIUrl")
 				// Instantiate Singularity client depending on specified flags.
 				var singClient client.Client
@@ -220,7 +198,7 @@ func main() {
 					singularity.WithDealStartDelay(durationToFilecoinEpoch(cctx.Duration("dealStartDelay"))),
 					singularity.WithDealDuration(durationToFilecoinEpoch(cctx.Duration("dealDuration"))),
 					singularity.WithSingularityClient(singClient),
-					singularity.WithWallet(wlt),
+					singularity.WithWalletKey(cctx.String("walletKey")),
 					singularity.WithMaxCarSize(cctx.String("singularityMaxCarSize")),
 					singularity.WithPackThreshold(cctx.Int64("singularityPackThreshold")),
 					singularity.WithScheduleUrlTemplate(cctx.String("experimentalSingularityContentURLTemplate")),
