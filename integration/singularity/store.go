@@ -53,14 +53,15 @@ func NewStore(o ...Option) (*SingularityStore, error) {
 }
 
 func (l *SingularityStore) Start(ctx context.Context) error {
+	logger := logger.With("dataset", l.datasetName)
 	ds, err := l.singularityClient.CreateDataset(ctx, dataset.CreateRequest{
 		Name:       l.datasetName,
 		MaxSizeStr: l.maxCarSize,
 	})
 	switch {
 	case err == nil:
-		logger.Infow("Successfully created motion dataset on singularity", "id", ds.ID, "name", l.datasetName)
-	case errors.Is(err, client.DuplicateRecordError{}):
+		logger.Infow("Successfully created motion dataset on singularity", "id", ds.ID)
+	case errors.As(err, &client.DuplicateRecordError{}):
 		logger.Info("Skipping motion dataset creation; already exists.")
 	default:
 		logger.Errorw("Failed to create motion dataset on singularity", "err", err)
@@ -70,7 +71,7 @@ func (l *SingularityStore) Start(ctx context.Context) error {
 	// find or create the motion datasource
 	sources, err := l.singularityClient.ListSourcesByDataset(ctx, l.datasetName)
 	if err != nil {
-		logger.Errorw("Failed to list sources for dataset", "dataset", l.datasetName, "err", err)
+		logger.Errorw("Failed to list sources for dataset", "err", err)
 		return fmt.Errorf("failed to list sources by dataset: %w", err)
 	}
 	found := false
@@ -83,7 +84,7 @@ func (l *SingularityStore) Start(ctx context.Context) error {
 		}
 	}
 	if !found {
-		logger.Info("Sounce not found on singularity. Created...")
+		logger.Info("Source not found on singularity. Created...")
 		source, err := l.singularityClient.CreateLocalSource(ctx, l.datasetName, datasource.LocalRequest{
 			SourcePath:        l.local.Dir(),
 			RescanInterval:    "0",
@@ -167,7 +168,13 @@ func (l *SingularityStore) Start(ctx context.Context) error {
 	// insure schedules are created
 	// TODO: handle config changes for replication -- singularity currently has no modify schedule endpoint
 	schedules, err := l.singularityClient.ListSchedulesByDataset(ctx, l.datasetName)
-	if err != nil {
+	switch {
+	case err == nil:
+		logger.Infow("Found existing schedules for dataset", "count", len(schedules))
+	case errors.As(err, &client.NotFoundError{}):
+		logger.Info("Found no schedules for dataset")
+	default:
+		logger.Errorw("Failed to list schedules for dataset", "err", err)
 		return err
 	}
 	pricePerGBEpoch, _ := (new(big.Rat).SetFrac(l.pricePerGiBEpoch.Int, big.NewInt(int64(1e18)))).Float64()
@@ -193,11 +200,19 @@ func (l *SingularityStore) Start(ctx context.Context) error {
 				PricePerGBEpoch:       pricePerGBEpoch,
 				PricePerGB:            pricePerGB,
 				PricePerDeal:          pricePerDeal,
+				Verified:              l.verifiedDeal,
+				IPNI:                  l.ipniAnnounce,
+				KeepUnsealed:          l.keepUnsealed,
 				StartDelay:            strconv.Itoa(int(l.dealStartDelay)*builtin.EpochDurationSeconds) + "s",
 				Duration:              strconv.Itoa(int(l.dealDuration)*builtin.EpochDurationSeconds) + "s",
 				ScheduleCron:          l.scheduleCron,
+				ScheduleCronPerpetual: l.scheduleCronPerpetual,
 				ScheduleDealNumber:    l.scheduleDealNumber,
-				ScheduleCronPerpetual: true,
+				TotalDealNumber:       l.totalDealNumber,
+				ScheduleDealSize:      l.scheduleDealSize,
+				TotalDealSize:         l.totalDealSize,
+				MaxPendingDealSize:    l.maxPendingDealSize,
+				MaxPendingDealNumber:  l.maxPendingDealNumber,
 				URLTemplate:           l.scheduleUrlTemplate,
 			}); err != nil {
 				logger.Errorw("Failed to create schedule for provider", "err", err)
