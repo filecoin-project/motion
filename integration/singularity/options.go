@@ -16,32 +16,48 @@ type (
 	// Option represents a configurable parameter in Motion service.
 	Option  func(*options) error
 	options struct {
-		wallet              *wallet.Wallet
-		storeDir            string
-		storageProviders    []address.Address
-		replicationFactor   uint
-		pricePerGiBEpoch    abi.TokenAmount
-		pricePerGiB         abi.TokenAmount
-		pricePerDeal        abi.TokenAmount
-		dealStartDelay      abi.ChainEpoch
-		dealDuration        abi.ChainEpoch
-		maxCarSize          string
-		packThreshold       int64
-		datasetName         string
-		singularityClient   client.Client
-		scheduleUrlTemplate string
-		scheduleDealNumber  int
-		scheduleCron        string
+		wallet                *wallet.Wallet
+		storeDir              string
+		storageProviders      []address.Address
+		replicationFactor     uint
+		pricePerGiBEpoch      abi.TokenAmount
+		pricePerGiB           abi.TokenAmount
+		pricePerDeal          abi.TokenAmount
+		dealStartDelay        abi.ChainEpoch
+		dealDuration          abi.ChainEpoch
+		maxCarSize            string
+		packThreshold         int64
+		datasetName           string
+		singularityClient     client.Client
+		scheduleUrlTemplate   string
+		scheduleDealNumber    int
+		scheduleCron          string
+		scheduleCronPerpetual bool
+		verifiedDeal          bool
+		ipniAnnounce          bool
+		keepUnsealed          bool
+		totalDealNumber       int
+		scheduleDealSize      string
+		totalDealSize         string
+		maxPendingDealSize    string
+		maxPendingDealNumber  int
 	}
 )
 
 func newOptions(o ...Option) (*options, error) {
 	opts := &options{
-		dealDuration:   builtin.EpochsInYear,
-		dealStartDelay: builtin.EpochsInHour * 72,
-		maxCarSize:     "31.5GiB",
-		packThreshold:  16 << 30,
-		datasetName:    "MOTION_DATASET",
+		dealDuration:          builtin.EpochsInYear,
+		dealStartDelay:        builtin.EpochsInHour * 72,
+		maxCarSize:            "31.5GiB",
+		packThreshold:         16 << 30,
+		datasetName:           "MOTION_DATASET",
+		scheduleCronPerpetual: true,
+		verifiedDeal:          true,
+		ipniAnnounce:          true,
+		scheduleDealSize:      "0",
+		totalDealSize:         "0",
+		maxPendingDealSize:    "0",
+		maxPendingDealNumber:  1,
 	}
 	for _, apply := range o {
 		if err := apply(opts); err != nil {
@@ -208,6 +224,87 @@ func WithScheduleDealNumber(n int) Option {
 func WithScheduleCron(c string) Option {
 	return func(o *options) error {
 		o.scheduleCron = c
+		return nil
+	}
+}
+
+// WithScheduleCronPerpetual sets whether a cron schedule should run in definitely.
+// Defaults to true.
+func WithScheduleCronPerpetual(v bool) Option {
+	return func(o *options) error {
+		o.scheduleCronPerpetual = v
+		return nil
+	}
+}
+
+// WithVerifiedDeal set whether the deals should be verified.
+// Defaults to true.
+func WithVerifiedDeal(v bool) Option {
+	return func(o *options) error {
+		o.verifiedDeal = v
+		return nil
+	}
+}
+
+// WithIPNIAnnounce set whether the deal payload should be announced to IPNI.
+// Defaults to true.
+func WithIPNIAnnounce(v bool) Option {
+	return func(o *options) error {
+		o.ipniAnnounce = v
+		return nil
+	}
+}
+
+// WithKeepUnsealed set whether the deal the deal should be kept unsealed.
+// Defaults to false.
+func WithKeepUnsealed(v bool) Option {
+	return func(o *options) error {
+		o.keepUnsealed = v
+		return nil
+	}
+}
+
+// WithTotalDealNumber sets the total number of deals.
+// Defaults to 0, i.e. unlimited.
+func WithTotalDealNumber(v int) Option {
+	return func(o *options) error {
+		o.totalDealNumber = v
+		return nil
+	}
+}
+
+// WithScheduleDealSize sets the size of deals per schedule trigger.
+// Defaults to "0".
+func WithScheduleDealSize(v string) Option {
+	return func(o *options) error {
+		o.scheduleDealSize = v
+		return nil
+	}
+}
+
+// WithTotalDealSize sets the total schedule deal size.
+// Defaults to "0".
+func WithTotalDealSize(v string) Option {
+	return func(o *options) error {
+		o.totalDealSize = v
+		return nil
+	}
+}
+
+// WithMaxPendingDealSize sets the max pending deal size.
+// Defaults to "0".
+func WithMaxPendingDealSize(v string) Option {
+	return func(o *options) error {
+		o.maxPendingDealSize = v
+		return nil
+	}
+}
+
+// WithMaxPendingDealNumber sets the max pending deal number.
+// Defaults to 1.
+func WithMaxPendingDealNumber(v int) Option {
+	return func(o *options) error {
+		o.maxPendingDealNumber = v
 		return nil
 	}
 }
