@@ -53,31 +53,37 @@ func NewStore(o ...Option) (*SingularityStore, error) {
 }
 
 func (l *SingularityStore) Start(ctx context.Context) error {
-	_, err := l.singularityClient.CreateDataset(ctx, dataset.CreateRequest{
+	ds, err := l.singularityClient.CreateDataset(ctx, dataset.CreateRequest{
 		Name:       l.datasetName,
 		MaxSizeStr: l.maxCarSize,
 	})
-	var asDuplicatedRecord client.DuplicateRecordError
-
-	// return errors, but ignore duplicated record, that means we just already created it
-	if err != nil && !errors.As(err, &asDuplicatedRecord) {
+	switch {
+	case err == nil:
+		logger.Infow("Successfully created motion dataset on singularity", "id", ds.ID, "name", l.datasetName)
+	case errors.Is(err, client.DuplicateRecordError{}):
+		logger.Info("Skipping motion dataset creation; already exists.")
+	default:
+		logger.Errorw("Failed to create motion dataset on singularity", "err", err)
 		return err
 	}
 
 	// find or create the motion datasource
 	sources, err := l.singularityClient.ListSourcesByDataset(ctx, l.datasetName)
 	if err != nil {
-		return err
+		logger.Errorw("Failed to list sources for dataset", "dataset", l.datasetName, "err", err)
+		return fmt.Errorf("failed to list sources by dataset: %w", err)
 	}
 	found := false
 	for _, source := range sources {
 		if source.Type == "local" && source.Path == strings.TrimSuffix(l.local.Dir(), "/") {
 			l.sourceID = source.ID
 			found = true
+			logger.Infow("Found source on singularity.", "id", source.ID)
 			break
 		}
 	}
 	if !found {
+		logger.Info("Sounce not found on singularity. Created...")
 		source, err := l.singularityClient.CreateLocalSource(ctx, l.datasetName, datasource.LocalRequest{
 			SourcePath:        l.local.Dir(),
 			RescanInterval:    "0",
@@ -85,23 +91,28 @@ func (l *SingularityStore) Start(ctx context.Context) error {
 			ScanningState:     model.Created,
 		})
 		if err != nil {
-			return err
+			logger.Errorw("Failed to create local source on singularity", "err", err)
+			return fmt.Errorf("failed to create local source: %w", err)
 		}
 		l.sourceID = source.ID
+		logger.Infow("Successfully created  local source on singularity", "id", source.ID)
 	}
 	// get default wallet encoded private key
 	walletAddr, err := l.wallet.GetDefault()
 	if err != nil {
-		return err
+		logger.Errorw("Failed to get default wallet", "err", err)
+		return fmt.Errorf("failed to get default wallet: %w", err)
 	}
 	ki, err := l.wallet.WalletExport(ctx, walletAddr)
 	if err != nil {
-		return err
+		logger.Errorw("Failed to export wallet private key", "err", err)
+		return fmt.Errorf("failed to export wallet: %w", err)
 	}
 
 	b, err := json.Marshal(ki)
 	if err != nil {
-		return err
+
+		return fmt.Errorf("failt to marshall wallet private key to JSON: %w", err)
 	}
 
 	pk := hex.EncodeToString(b)
@@ -109,22 +120,25 @@ func (l *SingularityStore) Start(ctx context.Context) error {
 	// insure default wallet is imported to singularity
 	wallets, err := l.singularityClient.ListWallets(ctx)
 	if err != nil {
-		return err
+		logger.Errorw("Failed to list singularity wallets", "err", err)
+		return fmt.Errorf("failed to list singularity wallets: %w", err)
 	}
 	var wlt *model.Wallet
 	for _, existing := range wallets {
 		if existing.PrivateKey == pk {
 			wlt = &existing
+			logger.Infow("Wallet found on singularity", "id", existing.ID)
 			break
 		}
 	}
 	if wlt == nil {
+		logger.Info("Wallet is not found on singularity. Importing...")
 		wlt, err = l.singularityClient.ImportWallet(ctx, wallethandler.ImportRequest{
 			PrivateKey: pk,
 		})
-
 		if err != nil {
-			return err
+			logger.Errorw("Failed to import wallet to singularity", "err", err)
+			return fmt.Errorf("failed to import wallet: %w", err)
 		}
 	}
 
@@ -136,14 +150,18 @@ func (l *SingularityStore) Start(ctx context.Context) error {
 	walletFound := false
 	for _, existing := range wallets {
 		if existing.Address == wlt.Address {
+			logger.Infow("Wallet for dataset found on singularity", "id", existing.ID)
 			walletFound = true
 			break
 		}
 	}
 	if !walletFound {
-		_, err := l.singularityClient.AddWalletToDataset(ctx, l.datasetName, wlt.Address)
-		if err != nil {
+		logger.Info("Wallet was not found. Creating...")
+		if wlt, err := l.singularityClient.AddWalletToDataset(ctx, l.datasetName, wlt.Address); err != nil {
+			logger.Errorw("Failed to add wallet to dataset", "err", err)
 			return err
+		} else {
+			logger.Infow("Successfully added wallet to dataset", "id", wlt.ID)
 		}
 	}
 	// insure schedules are created
@@ -158,15 +176,18 @@ func (l *SingularityStore) Start(ctx context.Context) error {
 
 	for _, sp := range l.storageProviders {
 		var foundSchedule bool
+		logger := logger.With("provider", sp)
 		for _, schd := range schedules {
 			scheduleAddr, err := address.NewFromString(schd.Provider)
 			if err == nil && sp == scheduleAddr {
 				foundSchedule = true
+				logger.Infow("Schedule found for provider", "id", schd.ID)
 				break
 			}
 		}
 		if !foundSchedule {
-			_, err := l.singularityClient.CreateSchedule(ctx, schedule.CreateRequest{
+			logger.Info("Schedule not found for provider. Creating...")
+			if schd, err := l.singularityClient.CreateSchedule(ctx, schedule.CreateRequest{
 				DatasetName:           l.datasetName,
 				Provider:              sp.String(),
 				PricePerGBEpoch:       pricePerGBEpoch,
@@ -178,9 +199,11 @@ func (l *SingularityStore) Start(ctx context.Context) error {
 				ScheduleDealNumber:    l.scheduleDealNumber,
 				ScheduleCronPerpetual: true,
 				URLTemplate:           l.scheduleUrlTemplate,
-			})
-			if err != nil {
-				return err
+			}); err != nil {
+				logger.Errorw("Failed to create schedule for provider", "err", err)
+				return fmt.Errorf("failed to create schedule: %w", err)
+			} else {
+				logger.Infow("Successfully created schedule for provider", "id", schd.ID)
 			}
 		}
 	}
