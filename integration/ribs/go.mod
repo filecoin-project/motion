@@ -3,7 +3,7 @@ module github.com/filecoin-project/motion/integration/ribs
 go 1.20
 
 require (
-	github.com/filecoin-project/lotus v1.23.2
+	github.com/filecoin-project/lotus v1.23.3
 	github.com/filecoin-project/motion v0.0.0-20230825112124-deb4698c67f0
 	github.com/google/uuid v1.3.1
 	github.com/ipfs/boxo v0.12.0
@@ -87,6 +87,7 @@ require (
 	github.com/filecoin-project/go-state-types v0.12.0 // indirect
 	github.com/filecoin-project/go-statemachine v1.0.3 // indirect
 	github.com/filecoin-project/go-statestore v0.2.0 // indirect
+	github.com/filecoin-project/kubo-api-client v0.0.2-0.20230829103503-14448166d14d // indirect
 	github.com/filecoin-project/lassie v0.17.0 // indirect
 	github.com/filecoin-project/specs-actors v0.9.15 // indirect
 	github.com/filecoin-project/specs-actors/v2 v2.3.6 // indirect
@@ -147,7 +148,6 @@ require (
 	github.com/ipfs/go-ipfs-delay v0.0.1 // indirect
 	github.com/ipfs/go-ipfs-ds-help v1.1.0 // indirect
 	github.com/ipfs/go-ipfs-exchange-interface v0.2.0 // indirect
-	github.com/ipfs/go-ipfs-http-client v0.5.0 // indirect
 	github.com/ipfs/go-ipfs-pq v0.0.3 // indirect
 	github.com/ipfs/go-ipfs-routing v0.3.0 // indirect
 	github.com/ipfs/go-ipfs-util v0.0.3 // indirect
@@ -159,12 +159,10 @@ require (
 	github.com/ipfs/go-log/v2 v2.5.1 // indirect
 	github.com/ipfs/go-merkledag v0.11.0 // indirect
 	github.com/ipfs/go-metrics-interface v0.0.1 // indirect
-	github.com/ipfs/go-path v0.3.1 // indirect
 	github.com/ipfs/go-peertaskqueue v0.8.1 // indirect
 	github.com/ipfs/go-unixfs v0.4.5 // indirect
 	github.com/ipfs/go-unixfsnode v1.7.4 // indirect
 	github.com/ipfs/go-verifcid v0.0.2 // indirect
-	github.com/ipfs/interface-go-ipfs-core v0.11.1 // indirect
 	github.com/ipld/go-car v0.6.1 // indirect
 	github.com/ipld/go-car/v2 v2.11.0 // indirect
 	github.com/ipld/go-codec-dagpb v1.6.0 // indirect
@@ -315,7 +313,6 @@ require (
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/dig v1.17.0 // indirect
 	go.uber.org/fx v1.20.0 // indirect
-	go.uber.org/goleak v1.2.1 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.25.0 // indirect
 	golang.org/x/crypto v0.12.0 // indirect

@@ -2,8 +2,6 @@ package singularity
 
 import (
 	"context"
-	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -98,25 +96,6 @@ func (l *SingularityStore) Start(ctx context.Context) error {
 		l.sourceID = source.ID
 		logger.Infow("Successfully created  local source on singularity", "id", source.ID)
 	}
-	// get default wallet encoded private key
-	walletAddr, err := l.wallet.GetDefault()
-	if err != nil {
-		logger.Errorw("Failed to get default wallet", "err", err)
-		return fmt.Errorf("failed to get default wallet: %w", err)
-	}
-	ki, err := l.wallet.WalletExport(ctx, walletAddr)
-	if err != nil {
-		logger.Errorw("Failed to export wallet private key", "err", err)
-		return fmt.Errorf("failed to export wallet: %w", err)
-	}
-
-	b, err := json.Marshal(ki)
-	if err != nil {
-
-		return fmt.Errorf("failt to marshall wallet private key to JSON: %w", err)
-	}
-
-	pk := hex.EncodeToString(b)
 
 	// insure default wallet is imported to singularity
 	wallets, err := l.singularityClient.ListWallets(ctx)
@@ -126,7 +105,7 @@ func (l *SingularityStore) Start(ctx context.Context) error {
 	}
 	var wlt *model.Wallet
 	for _, existing := range wallets {
-		if existing.PrivateKey == pk {
+		if existing.PrivateKey == l.walletKey {
 			wlt = &existing
 			logger.Infow("Wallet found on singularity", "id", existing.ID)
 			break
@@ -135,7 +114,7 @@ func (l *SingularityStore) Start(ctx context.Context) error {
 	if wlt == nil {
 		logger.Info("Wallet is not found on singularity. Importing...")
 		wlt, err = l.singularityClient.ImportWallet(ctx, wallethandler.ImportRequest{
-			PrivateKey: pk,
+			PrivateKey: l.walletKey,
 		})
 		if err != nil {
 			logger.Errorw("Failed to import wallet to singularity", "err", err)
