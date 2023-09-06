@@ -1,6 +1,7 @@
 package singularity
 
 import (
+	"errors"
 	"net/http"
 	"os"
 
@@ -9,14 +10,13 @@ import (
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/builtin"
-	"github.com/filecoin-project/motion/wallet"
 )
 
 type (
 	// Option represents a configurable parameter in Motion service.
 	Option  func(*options) error
 	options struct {
-		wallet                *wallet.Wallet
+		walletKey             string
 		storeDir              string
 		storageProviders      []address.Address
 		replicationFactor     uint
@@ -64,10 +64,8 @@ func newOptions(o ...Option) (*options, error) {
 			return nil, err
 		}
 	}
-	if opts.wallet == nil {
-		var err error
-		opts.wallet, err = wallet.New()
-		return nil, err
+	if opts.walletKey == "" {
+		return nil, errors.New("must specify a wallet address")
 	}
 	if opts.storeDir == "" {
 		opts.storeDir = os.TempDir()
@@ -92,11 +90,10 @@ func WithStoreDir(s string) Option {
 	}
 }
 
-// WithWallet sets the wallet used by Motion to interact with Filecoin network.
-// Defaults to wallet.New.
-func WithWallet(w *wallet.Wallet) Option {
+// WithWalletKey sets the wallet used by Motion to interact with Filecoin network.
+func WithWalletKey(wk string) Option {
 	return func(o *options) error {
-		o.wallet = w
+		o.walletKey = wk
 		return nil
 	}
 }
