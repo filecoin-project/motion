@@ -16,27 +16,27 @@ COMMANDS:
    help, h  Shows a list of commands or help for one command
 
 GLOBAL OPTIONS:
-   --dealDuration value                                                         The duration of deals made on Filecoin (default: One year (356 days))
-   --dealStartDelay value                                                       The deal start epoch delay. (default: 72 hours)
+   --dealDuration value                                                         The duration of deals made on Filecoin (default: One year (356 days)) [$MOTION_DEAL_DURATION]
+   --dealStartDelay value                                                       The deal start epoch delay. (default: 72 hours) [$MOTION_DEAL_START_DELAY]
    --experimentalRemoteSingularityAPIUrl value                                  When using a singularity as the storage engine, if set, uses a remote HTTP API to interface with Singularity (default: use singularity as a code library)
    --experimentalSingularityContentURLTemplate value                            When using a singularity as the storage engine, if set, setups up online deals to use the given url template for making online deals (default: make offline deals)
    --experimentalSingularityScheduleCron value                                  When using a singularity as the storage engine, if set, setups up the cron schedule to send out batch deals. (default: disabled)
    --experimentalSingularityScheduleDealNumber value                            When using a singularity as the storage engine, if set, setups up the max deal number per triggered schedule. (default: unlimited)
    --experimentalSingularityStore                                               Whether to use experimental Singularity store as the storage and deal making engine (default: Local storage is used)
    --help, -h                                                                   show help
-   --localWalletDir value                                                       The path to the local wallet directory. (default: Defaults to '<user-home-directory>/.motion/wallet' with wallet key auto-generated if not present. Note that the directory permissions must be at most 0600.) [$MOTION_LOCAL_WALLET_DIR]
-   --localWalletGenerateIfNotExist                                              Whether to generate the local wallet key if none is found (default: true)
-   --pricePerDeal value                                                         The maximum price per deal in attoFIL. (default: 0)
-   --pricePerGiB value                                                          The maximum  price per GiB in attoFIL. (default: 0)
-   --pricePerGiBEpoch value                                                     The maximum price per GiB per Epoch in attoFIL. (default: 0)
+   --pricePerDeal value                                                         The maximum price per deal in attoFIL. (default: 0) [$MOTION_PRICE_PER_DEAL]
+   --pricePerGiB value                                                          The maximum  price per GiB in attoFIL. (default: 0) [$MOTION_PRICE_PER_GIB]
+   --pricePerGiBEpoch value                                                     The maximum price per GiB per Epoch in attoFIL. (default: 0) [$MOTION_PRICE_PER_GIB_EPOCH]
    --replicationFactor value                                                    The number of desired replicas per blob (default: Number of storage providers; see 'storageProvider' flag.)
    --singularityMaxCarSize value                                                The maximum Singularity generated CAR size (default: "31.5GiB")
    --singularityPackThreshold value                                             The Singularity store pack threshold in number of bytes (default: 17,179,869,184 (i.e. 16 GiB))
-   --storageProvider value, --sp value [ --storageProvider value, --sp value ]  Storage providers to which to make deals with. Multiple providers may be specified. (default: No deals are made to replicate data onto storage providers.)
+   --storageProvider value, --sp value [ --storageProvider value, --sp value ]  Storage providers to which to make deals with. Multiple providers may be specified. (default: No deals are made to replicate data onto storage providers.) [$MOTION_STORAGE_PROVIDERS]
    --storeDir value                                                             The path at which to store Motion data (default: OS Temporary directory) [$MOTION_STORE_DIR]
+   --walletKey value                                                            Hex encoded private key for the wallet to use with motion [$MOTION_WALLET_KEY]
 
    Lotus
 
+   --lotus-test        (default: false) [$LOTUS_TEST]
    --lotusApi value    Lotus RPC API endpoint (default: "https://api.node.glif.io/rpc/v1") [$LOTUS_API]
    --lotusToken value  Lotus RPC API token [$LOTUS_TOKEN]
 ```
