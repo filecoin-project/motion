@@ -248,30 +248,45 @@ func (l *SingularityStore) Shutdown(ctx context.Context) error {
 func (s *SingularityStore) Put(ctx context.Context, reader io.ReadCloser) (*blob.Descriptor, error) {
 	desc, err := s.local.Put(ctx, reader)
 	if err != nil {
-		return nil, err
+		logger.Errorw("Failed to store file locally", "err", err)
+		return nil, fmt.Errorf("failed to put file locally: %w", err)
 	}
-	file, err := s.singularityClient.PushFile(ctx, s.sourceID, datasource.FileInfo{Path: desc.ID.String() + ".bin"})
+	filePath := desc.ID.String() + ".bin"
+	file, err := s.singularityClient.PushFile(ctx, s.sourceID, datasource.FileInfo{Path: filePath})
 	if err != nil {
+		logger.Errorw("Failed to push file to singularity", "path", filePath, "err", err)
 		return nil, fmt.Errorf("error creating singularity entry: %w", err)
 	}
 	select {
 	case <-ctx.Done():
-		return nil, ctx.Err()
+		err := ctx.Err()
+		logger.Errorw("Context done while putting file", "err", err)
+		return nil, err
 	case s.toPack <- file.ID:
 	}
 	idFile, err := os.CreateTemp(s.local.Dir(), "motion_local_store_*.bin.temp")
 	if err != nil {
+		logger.Errorw("Failed to create temporary file", "err", err)
 		return nil, err
 	}
-	defer idFile.Close()
+	defer func() {
+		if err := idFile.Close(); err != nil {
+			logger.Debugw("Failed to close temporary file", "err", err)
+		}
+	}()
 	_, err = idFile.Write([]byte(strconv.FormatUint(file.ID, 10)))
 	if err != nil {
-		_ = os.Remove(idFile.Name())
+		if err := os.Remove(idFile.Name()); err != nil {
+			logger.Debugw("Failed to remove temporary file", "path", idFile.Name(), "err", err)
+		}
+		logger.Errorw("Failed to write ID file", "err", err)
 		return nil, err
 	}
 	if err = os.Rename(idFile.Name(), path.Join(s.local.Dir(), desc.ID.String()+".id")); err != nil {
+		logger.Errorw("Failed to move ID file to store", "err", err)
 		return nil, err
 	}
+	logger.Infow("Stored blob successfully", "id", desc.ID, "size", desc.Size, "singularityFileID", file.ID)
 	return desc, nil
 }
 
