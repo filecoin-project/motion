@@ -91,6 +91,7 @@ func (l *SingularityStore) Start(ctx context.Context) error {
 		Context: ctx,
 	})
 	if err != nil {
+		logger.Errorw("Failed to list preparations", "err", err)
 		return fmt.Errorf("failed to list preparations: %w", err)
 	}
 
@@ -105,6 +106,7 @@ func (l *SingularityStore) Start(ctx context.Context) error {
 		// If no preparation was found, initialize it
 		preparation, err = l.initPreparation(ctx)
 		if err != nil {
+			logger.Errorw("First-time preparation initialization failed", "err", err)
 			return fmt.Errorf("first-time preparation initialization failed: %w", err)
 		}
 	}
