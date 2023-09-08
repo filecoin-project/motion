@@ -140,7 +140,7 @@ func main() {
 				Name:        "verifiedDeal",
 				Usage:       "whether deals made with motion should be verified deals",
 				DefaultText: "Deals are verified",
-				Value:       true,
+				Value:       false,
 				EnvVars:     []string{"MOTION_VERIFIED_DEAL"},
 			},
 			&cli.StringFlag{
