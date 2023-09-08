@@ -98,13 +98,14 @@ func (l *SingularityStore) Start(ctx context.Context) error {
 	for _, preparationCmp := range listPreparationsRes.Payload {
 		if preparationCmp.Name == l.preparationName {
 			preparation = preparationCmp
+			break
 		}
 	}
 	if preparation == nil {
 		// If no preparation was found, initialize it
 		preparation, err = l.initPreparation(ctx)
 		if err != nil {
-			return fmt.Errorf("first-time preparation initialization failed")
+			return fmt.Errorf("first-time preparation initialization failed: %w", err)
 		}
 	}
 
