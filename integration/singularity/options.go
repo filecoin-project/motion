@@ -48,7 +48,7 @@ func newOptions(o ...Option) (*options, error) {
 		dealStartDelay:        builtin.EpochsInHour * 72,
 		maxCarSize:            "31.5GiB",
 		packThreshold:         16 << 30,
-		preparationName:       "MOTION_DATASET",
+		preparationName:       "MOTION_PREPARATION",
 		scheduleCronPerpetual: true,
 		verifiedDeal:          false,
 		keepUnsealed:          true,
@@ -179,9 +179,9 @@ func WithPackThreshold(s int64) Option {
 	}
 }
 
-// WithDatasetName sets the singularity dataset name used to store data.
-// Defaults to "MOTION_DATASET".
-func WithDatasetName(n string) Option {
+// WithPreparationName sets the singularity preparation name used to store data.
+// Defaults to "MOTION_PREPARATION".
+func WithPreparationName(n string) Option {
 	return func(o *options) error {
 		o.preparationName = n
 		return nil
