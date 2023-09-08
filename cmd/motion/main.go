@@ -143,13 +143,6 @@ func main() {
 				Value:       false,
 				EnvVars:     []string{"MOTION_VERIFIED_DEAL"},
 			},
-			&cli.BoolFlag{
-				Name:        "keepUnsealed",
-				Usage:       "whether storage providers should retain an unsealed copy for motion deals to make them retrievable",
-				DefaultText: "storage providers WILL maintain an unsealed copy",
-				Value:       true,
-				EnvVars:     []string{"MOTION_KEEP_UNSEALED"},
-			},
 			&cli.StringFlag{
 				Name:        "experimentalSingularityContentURLTemplate",
 				Usage:       "When using a singularity as the storage engine, if set, setups up online deals to use the given url template for making online deals",
