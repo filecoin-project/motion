@@ -152,7 +152,7 @@ func (l *SingularityStore) Start(ctx context.Context) error {
 		return nil
 	}
 	walletFound := false
-	for _, existing := range []*models.ModelWallet{listAttachedWalletsRes.Payload} {
+	for _, existing := range listAttachedWalletsRes.Payload {
 		if existing.Address == wlt.Address {
 			logger.Infow("Wallet for dataset found on singularity", "id", existing.ID)
 			walletFound = true
