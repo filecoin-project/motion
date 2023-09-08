@@ -2,11 +2,9 @@ package singularity
 
 import (
 	"errors"
-	"net/http"
 	"os"
 
-	"github.com/data-preservation-programs/singularity/client"
-	httpclient "github.com/data-preservation-programs/singularity/client/http"
+	singularityclient "github.com/data-preservation-programs/singularity/client/swagger/http"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/builtin"
@@ -27,8 +25,8 @@ type (
 		dealDuration          abi.ChainEpoch
 		maxCarSize            string
 		packThreshold         int64
-		datasetName           string
-		singularityClient     client.Client
+		preparationName       string
+		singularityClient     *singularityclient.SingularityAPI
 		scheduleUrlTemplate   string
 		scheduleDealNumber    int
 		scheduleCron          string
@@ -50,7 +48,7 @@ func newOptions(o ...Option) (*options, error) {
 		dealStartDelay:        builtin.EpochsInHour * 72,
 		maxCarSize:            "31.5GiB",
 		packThreshold:         16 << 30,
-		datasetName:           "MOTION_DATASET",
+		preparationName:       "MOTION_DATASET",
 		scheduleCronPerpetual: true,
 		verifiedDeal:          false,
 		keepUnsealed:          true,
@@ -76,7 +74,7 @@ func newOptions(o ...Option) (*options, error) {
 		opts.replicationFactor = uint(len(opts.storageProviders))
 	}
 	if opts.singularityClient == nil {
-		opts.singularityClient = httpclient.NewHTTPClient(http.DefaultClient, "http://localhost:9090")
+		opts.singularityClient = singularityclient.Default
 	}
 	return opts, nil
 }
@@ -185,14 +183,14 @@ func WithPackThreshold(s int64) Option {
 // Defaults to "MOTION_DATASET".
 func WithDatasetName(n string) Option {
 	return func(o *options) error {
-		o.datasetName = n
+		o.preparationName = n
 		return nil
 	}
 }
 
 // WithSingularityClient sets the client used to communicate with Singularity API.
 // Defaults to HTTP client with API endpoint http://localhost:9090.
-func WithSingularityClient(c client.Client) Option {
+func WithSingularityClient(c *singularityclient.SingularityAPI) Option {
 	return func(o *options) error {
 		o.singularityClient = c
 		return nil
