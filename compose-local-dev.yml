@@ -13,9 +13,6 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    networks:
-      - default
-      - devnet
 
   singularity_dataset_worker:
     extends:
@@ -24,9 +21,6 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    networks:
-      - default
-      - devnet
 
   singularity_deal_pusher:
     extends:
@@ -35,9 +29,6 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    networks:
-      - default
-      - devnet
 
   singularity_deal_tracker:
     extends:
@@ -46,9 +37,6 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    networks:
-      - default
-      - devnet
 
   singularity_content_provider:
     extends:
@@ -57,9 +45,6 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    networks:
-      - default
-      - devnet
 
   motion:
     build: .
@@ -84,13 +69,11 @@ services:
       - MOTION_SINGULARITY_SCHEDULE_DEAL_NUMBER
       - MOTION_WALLET_KEY
       - MOTION_VERIFIED_DEAL
+      - MOTION_KEEP_UNSEALED
     volumes:
       - motion-singularity-volume:/usr/src/app/storage
     depends_on:
       - singularity_api
-    networks:
-      - default
-      - devnet
 
 volumes:
   motion-singularity-volume:
@@ -98,6 +81,3 @@ volumes:
 networks:
   default:
     name: motion
-  devnet:
-    name: devnet
-    external: true

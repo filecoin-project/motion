@@ -140,8 +140,15 @@ func main() {
 				Name:        "verifiedDeal",
 				Usage:       "whether deals made with motion should be verified deals",
 				DefaultText: "Deals are verified",
-				Value:       true,
+				Value:       false,
 				EnvVars:     []string{"MOTION_VERIFIED_DEAL"},
+			},
+			&cli.BoolFlag{
+				Name:        "keepUnsealed",
+				Usage:       "whether storage providers should retain an unsealed copy for motion deals to make them retrievable",
+				DefaultText: "storage providers WILL maintain an unsealed copy",
+				Value:       true,
+				EnvVars:     []string{"MOTION_KEEP_UNSEALED"},
 			},
 			&cli.StringFlag{
 				Name:        "experimentalSingularityContentURLTemplate",

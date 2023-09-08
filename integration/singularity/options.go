@@ -53,6 +53,7 @@ func newOptions(o ...Option) (*options, error) {
 		datasetName:           "MOTION_DATASET",
 		scheduleCronPerpetual: true,
 		verifiedDeal:          true,
+		keepUnsealed:          true,
 		ipniAnnounce:          true,
 		scheduleDealSize:      "0",
 		totalDealSize:         "0",
