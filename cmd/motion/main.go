@@ -124,15 +124,24 @@ func main() {
 				EnvVars:     []string{"MOTION_DEAL_DURATION"},
 			},
 			&cli.StringFlag{
-				Name:  "singularityMaxCarSize",
-				Usage: "The maximum Singularity generated CAR size",
-				Value: "31.5GiB",
+				Name:    "singularityMaxCarSize",
+				Usage:   "The maximum Singularity generated CAR size",
+				Value:   "31.5GiB",
+				EnvVars: []string{"MOTION_SINGULARITY_MAX_CAR_SIZE"},
 			},
 			&cli.Int64Flag{
 				Name:        "singularityPackThreshold",
 				Usage:       "The Singularity store pack threshold in number of bytes",
 				DefaultText: "17,179,869,184 (i.e. 16 GiB)",
 				Value:       16 << 30,
+				EnvVars:     []string{"MOTION_SINGULARITY_PACK_THRESHOLD"},
+			},
+			&cli.BoolFlag{
+				Name:        "verifiedDeal",
+				Usage:       "whether deals made with motion should be verified deals",
+				DefaultText: "Deals are verified",
+				Value:       true,
+				EnvVars:     []string{"MOTION_VERIFIED_DEAL"},
 			},
 			&cli.StringFlag{
 				Name:        "experimentalSingularityContentURLTemplate",
@@ -142,12 +151,16 @@ func main() {
 			&cli.StringFlag{
 				Name:        "experimentalSingularityScheduleCron",
 				Usage:       "When using a singularity as the storage engine, if set, setups up the cron schedule to send out batch deals.",
-				DefaultText: "disabled",
+				DefaultText: "runs every minute",
+				Value:       "* * * * *",
+				EnvVars:     []string{"MOTION_SINGULARITY_SCHEDULE_CRON"},
 			},
 			&cli.IntFlag{
 				Name:        "experimentalSingularityScheduleDealNumber",
 				Usage:       "When using a singularity as the storage engine, if set, setups up the max deal number per triggered schedule.",
-				DefaultText: "unlimited",
+				DefaultText: "1 per trigger",
+				Value:       1,
+				EnvVars:     []string{"MOTION_SINGULARITY_SCHEDULE_DEAL_NUMBER"},
 			},
 		},
 		Action: func(cctx *cli.Context) error {
@@ -206,6 +219,7 @@ func main() {
 					singularity.WithScheduleUrlTemplate(cctx.String("experimentalSingularityContentURLTemplate")),
 					singularity.WithScheduleCron(cctx.String("experimentalSingularityScheduleCron")),
 					singularity.WithScheduleDealNumber(cctx.Int("experimentalSingularityScheduleDealNumber")),
+					singularity.WithVerifiedDeal(cctx.Bool("verifiedDeal")),
 				)
 				if err != nil {
 					logger.Errorw("Failed to instantiate singularity store", "err", err)

@@ -1,1 +1,3 @@
 extern
+.env
+.env.local
