@@ -3,7 +3,7 @@ module github.com/filecoin-project/motion
 go 1.20
 
 require (
-	github.com/data-preservation-programs/singularity v0.4.1-0.20230908184618-6cb52f84dd4d
+	github.com/data-preservation-programs/singularity v0.4.1
 	github.com/filecoin-project/go-address v1.1.0
 	github.com/filecoin-project/go-state-types v0.12.0
 	github.com/google/uuid v1.3.1
