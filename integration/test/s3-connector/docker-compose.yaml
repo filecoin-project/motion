@@ -1,0 +1,14 @@
+services:
+  cloudserver:
+    image: ghcr.io/filecoin-project/motion-cloudserver:${MOTION_COULDSERVER_VERSION}
+    environment:
+      REMOTE_MANAGEMENT_DISABLE: 1
+      S3DATA: 'multiple'
+      MOTION_HOST: 'motion'
+    ports:
+      - "8000:8000"
+
+networks:
+  default:
+    name: devnet
+    external: true
