@@ -119,7 +119,6 @@ services:
     restart: unless-stopped
     environment:
       - MOTION_STORE_DIR=/usr/src/app/storage
-      - MOTION_LOCAL_WALLET_DIR=/usr/src/app/wallet
       - LOTUS_TEST
       - LOTUS_API
       - LOTUS_TOKEN
