@@ -1,0 +1,8 @@
+name: AWS CLI S3 Upload Test
+description: Creates a file, uploads it using the AWS CLI S3 API, downloads it, and compares the two files.
+runs:
+  using: "composite"
+  steps:
+    - name: Test
+      run: ./.github/actions/aws-cli-s3-upload-test/upload.sh
+      shell: bash

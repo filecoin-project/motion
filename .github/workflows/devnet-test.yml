@@ -69,7 +69,17 @@ jobs:
           command: |
             cd integration/test/motionlarity
             docker compose ps --services --filter "status=running" | grep motion
-      - name: Run tests
+      - name: Run Motion integration tests
         env:
           MOTION_INTEGRATION_TEST: 'true'
         run: go test ./integration/test -v
+      - name: Start S3 Connector
+        run: |
+          cd integration/test/s3-connector
+          docker compose up -d
+      - name: Run S3 Connector integration tests
+        env:
+          AWS_ACCESS_KEY_ID: 'accessKey1'
+          AWS_SECRET_ACCESS_KEY: 'verySecretKey1'
+          AWS_DEFAULT_REGION: 'location-motion-v1'
+        uses: ./.github/actions/aws-cli-s3-upload-test
