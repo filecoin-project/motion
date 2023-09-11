@@ -104,7 +104,7 @@ func (l *SingularityStore) Start(ctx context.Context) error {
 	}
 	if preparation == nil {
 		// If no preparation was found, initialize it
-		preparation, err = l.initPreparation(ctx)
+		_, err = l.initPreparation(ctx)
 		if err != nil {
 			logger.Errorw("First-time preparation initialization failed", "err", err)
 			return fmt.Errorf("first-time preparation initialization failed: %w", err)
