@@ -356,10 +356,11 @@ func (s *SingularityStore) Get(ctx context.Context, id blob.ID) (io.ReadSeekClos
 		Context: ctx,
 		ID:      int64(fileID),
 	})
-	if strings.Contains(err.Error(), "404") {
-		return nil, blob.ErrBlobNotFound
-	}
 	if err != nil {
+		if strings.Contains(err.Error(), "404") {
+			return nil, blob.ErrBlobNotFound
+		}
+
 		return nil, fmt.Errorf("error loading singularity entry: %w", err)
 	}
 	var decoded blob.ID
@@ -389,10 +390,11 @@ func (s *SingularityStore) Describe(ctx context.Context, id blob.ID) (*blob.Desc
 		Context: ctx,
 		ID:      int64(fileID),
 	})
-	if strings.Contains(err.Error(), "404") {
-		return nil, blob.ErrBlobNotFound
-	}
 	if err != nil {
+		if strings.Contains(err.Error(), "404") {
+			return nil, blob.ErrBlobNotFound
+		}
+
 		return nil, fmt.Errorf("error loading singularity entry: %w", err)
 	}
 	var decoded blob.ID
