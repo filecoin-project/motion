@@ -172,12 +172,13 @@ func (l *SingularityStore) Start(ctx context.Context) error {
 			logger.Infow("Successfully added wallet to dataset", "id", attachWalletRes.Payload.ID)
 		}
 	}
-	// Ensure listPreparationSchedulesRes are created
+	// Ensure schedules are created
 	// TODO: handle config changes for replication -- singularity currently has no modify schedule endpoint
 	listPreparationSchedulesRes, err := l.singularityClient.DealSchedule.ListPreparationSchedules(&deal_schedule.ListPreparationSchedulesParams{
 		Context: ctx,
 		ID:      l.preparationName,
 	})
+
 	switch {
 	case err == nil:
 		logger.Infow("Found existing schedules for dataset", "count", len(listPreparationSchedulesRes.Payload))
