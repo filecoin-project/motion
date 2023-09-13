@@ -369,6 +369,27 @@ func (s *SingularityStore) Put(ctx context.Context, reader io.ReadCloser) (*blob
 	return desc, nil
 }
 
+// Sends a signal when done writing a target amount of bytes
+type syncWriter struct {
+	inner      io.Writer
+	offset     int64
+	targetSize int64
+	done       chan struct{}
+}
+
+func (w *syncWriter) Write(p []byte) (int, error) {
+	// Move offset forward and signal done if it hits or exceeds targetSize
+	w.offset += int64(len(p))
+	if w.offset >= w.targetSize {
+		select {
+		case w.done <- struct{}{}:
+		default:
+		}
+	}
+
+	return w.inner.Write(p)
+}
+
 type SingularityReader struct {
 	store  *SingularityStore
 	fileID uint64
@@ -377,7 +398,14 @@ type SingularityReader struct {
 }
 
 func (r *SingularityReader) Read(p []byte) (int, error) {
-	writer := bytes.NewBuffer(p)
+	buf := bytes.NewBuffer(p)
+	buf.Reset()
+	writer := &syncWriter{
+		inner:      buf,
+		offset:     0,
+		targetSize: int64(len(p)),
+		done:       make(chan struct{}, 1),
+	}
 
 	if r.offset >= r.size {
 		return 0, io.EOF
@@ -398,6 +426,8 @@ func (r *SingularityReader) Read(p []byte) (int, error) {
 	if err != nil {
 		return 0, fmt.Errorf("failed to retrieve file slice: %w", err)
 	}
+
+	<-writer.done
 
 	r.offset += readLen
 
