@@ -2,16 +2,11 @@ package main
 
 import (
 	"fmt"
-	"net/http"
 	"os"
 	"os/signal"
 	"time"
 
-	"github.com/data-preservation-programs/singularity/client"
-	httpclient "github.com/data-preservation-programs/singularity/client/http"
-	libclient "github.com/data-preservation-programs/singularity/client/lib"
-	"github.com/data-preservation-programs/singularity/database"
-	"github.com/data-preservation-programs/singularity/service/epochutil"
+	singularityclient "github.com/data-preservation-programs/singularity/client/swagger/http"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
@@ -21,7 +16,6 @@ import (
 	"github.com/filecoin-project/motion/integration/singularity"
 	"github.com/ipfs/go-log/v2"
 	"github.com/urfave/cli/v2"
-	"github.com/ybbus/jsonrpc/v3"
 )
 
 var logger = log.Logger("motion/cmd")
@@ -169,28 +163,14 @@ func main() {
 			if cctx.Bool("experimentalSingularityStore") {
 				singularityAPIUrl := cctx.String("experimentalRemoteSingularityAPIUrl")
 				// Instantiate Singularity client depending on specified flags.
-				var singClient client.Client
+				var singClient *singularityclient.SingularityAPI
 				if singularityAPIUrl != "" {
-					singClient = httpclient.NewHTTPClient(http.DefaultClient, singularityAPIUrl)
+					singClient = singularityclient.NewHTTPClientWithConfig(
+						nil,
+						singularityclient.DefaultTransportConfig().WithHost(singularityAPIUrl),
+					)
 				} else {
-					lotusAPI := cctx.String("lotusApi")
-					lotusToken := cctx.String("lotusToken")
-					db, closer, err := database.OpenWithLogger("sqlite:" + storeDir + "/singularity.db")
-					if err != nil {
-						logger.Errorw("Failed to open singularity database", "err", err)
-						return err
-					}
-					defer closer.Close()
-
-					if err := epochutil.Initialize(cctx.Context, lotusAPI, lotusToken); err != nil {
-						logger.Errorw("Failed to initialized epoch timing", "err", err)
-						return err
-					}
-					singClient, err = libclient.NewClient(db, jsonrpc.NewClient(lotusAPI))
-					if err != nil {
-						logger.Errorw("Failed to get singularity client", "err", err)
-						return err
-					}
+					return fmt.Errorf("singularity API URL is required")
 				}
 
 				// Parse any configured storage provider addresses.

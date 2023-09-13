@@ -77,6 +77,11 @@ jobs:
         run: |
           cd integration/test/s3-connector
           docker compose up -d
+      - name: Print docker logs
+        if: always()
+        run: |
+          cd integration/test/motionlarity
+          docker compose logs
       - name: Run S3 Connector integration tests
         env:
           AWS_ACCESS_KEY_ID: 'accessKey1'
