@@ -6,45 +6,53 @@ services:
       file: docker-compose.yml
       service: db
 
+  singularity_admin_init:
+    extends:
+      file: docker-compose.yml
+      service: singularity_admin_init
+    depends_on:
+      db:
+        condition: service_healthy
+
   singularity_api:
     extends:
       file: docker-compose.yml
       service: singularity_api
     depends_on:
-      db:
-        condition: service_healthy
+      singularity_admin_init:
+        condition: service_completed_successfully
 
   singularity_dataset_worker:
     extends:
       file: docker-compose.yml
       service: singularity_dataset_worker
     depends_on:
-      db:
-        condition: service_healthy
+      singularity_admin_init:
+        condition: service_completed_successfully
 
   singularity_deal_pusher:
     extends:
       file: docker-compose.yml
       service: singularity_deal_pusher
     depends_on:
-      db:
-        condition: service_healthy
+      singularity_admin_init:
+        condition: service_completed_successfully
 
   singularity_deal_tracker:
     extends:
       file: docker-compose.yml
       service: singularity_deal_tracker
     depends_on:
-      db:
-        condition: service_healthy
+      singularity_admin_init:
+        condition: service_completed_successfully
 
   singularity_content_provider:
     extends:
       file: docker-compose.yml
       service: singularity_content_provider
     depends_on:
-      db:
-        condition: service_healthy
+      singularity_admin_init:
+        condition: service_completed_successfully
 
   motion:
     build: .
