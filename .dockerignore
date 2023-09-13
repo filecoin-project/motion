@@ -1,4 +1,3 @@
 .github
-extern
 *.md
 integration/test
