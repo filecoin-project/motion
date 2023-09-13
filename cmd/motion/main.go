@@ -165,7 +165,7 @@ func main() {
 				// Instantiate Singularity client depending on specified flags.
 				var singClient *singularityclient.SingularityAPI
 				if singularityAPIUrl != "" {
-					singularityclient.NewHTTPClientWithConfig(
+					singClient = singularityclient.NewHTTPClientWithConfig(
 						nil,
 						singularityclient.DefaultTransportConfig().WithHost(singularityAPIUrl),
 					)

@@ -56,7 +56,7 @@ services:
 
   motion:
     build: .
-    entrypoint: motion --experimentalSingularityStore --experimentalRemoteSingularityAPIUrl=http://singularity_api:9090 --experimentalSingularityContentURLTemplate=${SINGULARITY_CONTENT_PROVIDER_DOMAIN:-http://singularity_content_provider:7778}/piece/{PIECE_CID}
+    entrypoint: motion --experimentalSingularityStore --experimentalRemoteSingularityAPIUrl=singularity_api:9090 --experimentalSingularityContentURLTemplate=${SINGULARITY_CONTENT_PROVIDER_DOMAIN:-http://singularity_content_provider:7778}/piece/{PIECE_CID}
     ports:
       - 40080:40080
     environment:

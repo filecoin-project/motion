@@ -70,7 +70,7 @@ func (l *SingularityStore) initPreparation(ctx context.Context) (*models.ModelPr
 		Context: ctx,
 		Request: &models.DataprepCreateRequest{
 			MaxSize:        &l.maxCarSize,
-			Name:           &l.preparationName,
+			Name:           l.preparationName,
 			SourceStorages: []string{l.sourceName},
 		},
 	})
@@ -83,7 +83,7 @@ func (l *SingularityStore) initPreparation(ctx context.Context) (*models.ModelPr
 }
 
 func (l *SingularityStore) Start(ctx context.Context) error {
-	logger := logger.With("dataset", l.preparationName)
+	logger := logger.With("preparation", l.preparationName)
 
 	// List out preparations and see if one with the configured name exists
 
@@ -143,18 +143,18 @@ func (l *SingularityStore) Start(ctx context.Context) error {
 		wlt = importWalletRes.Payload
 	}
 
-	// Ensure wallet is assigned to dataset
+	// Ensure wallet is assigned to preparation
 	listAttachedWalletsRes, err := l.singularityClient.WalletAssociation.ListAttachedWallets(&wallet_association.ListAttachedWalletsParams{
 		Context: ctx,
 		ID:      l.preparationName,
 	})
 	if err != nil {
-		return nil
+		return err
 	}
 	walletFound := false
 	for _, existing := range listAttachedWalletsRes.Payload {
 		if existing.Address == wlt.Address {
-			logger.Infow("Wallet for dataset found on singularity", "id", existing.ID)
+			logger.Infow("Wallet for preparation found on singularity", "id", existing.ID)
 			walletFound = true
 			break
 		}
@@ -166,10 +166,10 @@ func (l *SingularityStore) Start(ctx context.Context) error {
 			ID:      l.preparationName,
 			Wallet:  wlt.Address,
 		}); err != nil {
-			logger.Errorw("Failed to add wallet to dataset", "err", err)
+			logger.Errorw("Failed to add wallet to preparation", "err", err)
 			return err
 		} else {
-			logger.Infow("Successfully added wallet to dataset", "id", attachWalletRes.Payload.ID)
+			logger.Infow("Successfully added wallet to preparation", "id", attachWalletRes.Payload.ID)
 		}
 	}
 	// Ensure schedules are created
@@ -181,18 +181,20 @@ func (l *SingularityStore) Start(ctx context.Context) error {
 
 	switch {
 	case err == nil:
-		logger.Infow("Found existing schedules for dataset", "count", len(listPreparationSchedulesRes.Payload))
+		logger.Infow("Found existing schedules for preparation", "count", len(listPreparationSchedulesRes.Payload))
 	case strings.Contains(err.Error(), "404"):
-		logger.Info("Found no schedules for dataset")
+		logger.Info("Found no schedules for preparation")
 	default:
-		logger.Errorw("Failed to list schedules for dataset", "err", err)
+		logger.Errorw("Failed to list schedules for preparation", "err", err)
 		return err
 	}
 	pricePerGBEpoch, _ := (new(big.Rat).SetFrac(l.pricePerGiBEpoch.Int, big.NewInt(int64(1e18)))).Float64()
 	pricePerGB, _ := (new(big.Rat).SetFrac(l.pricePerGiB.Int, big.NewInt(int64(1e18)))).Float64()
 	pricePerDeal, _ := (new(big.Rat).SetFrac(l.pricePerDeal.Int, big.NewInt(int64(1e18)))).Float64()
 
+	logger.Info("Checking %v storage providers", len(l.storageProviders))
 	for _, sp := range l.storageProviders {
+		logger.Info("Checking storage provider %s", sp)
 		var foundSchedule bool
 		logger := logger.With("provider", sp)
 		for _, schd := range listPreparationSchedulesRes.Payload {
@@ -234,6 +236,8 @@ func (l *SingularityStore) Start(ctx context.Context) error {
 			} else {
 				logger.Infow("Successfully created schedule for provider", "id", createScheduleRes.Payload.ID)
 			}
+		} else {
+			logger.Infow("Found schedule")
 		}
 	}
 	go l.runPreparationJobs()
