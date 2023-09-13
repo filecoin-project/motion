@@ -21,7 +21,7 @@ type SingularityReader struct {
 func (r *SingularityReader) Read(p []byte) (int, error) {
 	buf := bytes.NewBuffer(p)
 	buf.Reset()
-	writer := &syncWriter{
+	writer := &signalWriter{
 		inner:      buf,
 		offset:     0,
 		targetSize: int64(len(p)),
@@ -81,7 +81,7 @@ func (r *SingularityReader) Close() error {
 }
 
 // Sends a signal when done writing a target amount of bytes
-type syncWriter struct {
+type signalWriter struct {
 	inner      io.Writer
 	offset     int64
 	targetSize int64
@@ -89,9 +89,11 @@ type syncWriter struct {
 	done chan struct{}
 }
 
-func (w *syncWriter) Write(p []byte) (int, error) {
+func (w *signalWriter) Write(p []byte) (int, error) {
+	n, err := w.inner.Write(p)
+
 	// Move offset forward and signal done if it hits or exceeds targetSize
-	w.offset += int64(len(p))
+	w.offset += int64(n)
 	if w.offset >= w.targetSize {
 		select {
 		case w.done <- struct{}{}:
@@ -99,5 +101,5 @@ func (w *syncWriter) Write(p []byte) (int, error) {
 		}
 	}
 
-	return w.inner.Write(p)
+	return n, err
 }
