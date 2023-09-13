@@ -1,4 +1,4 @@
-# :motorcycle: motion
+# :motorcycle: Filecoin REST API
 
 *Accelerating data onto Filecoin!*
 
@@ -14,7 +14,7 @@
 
 ## Background
 
-Motion is a service to propel data onto Filecoin network via a simple easy to use API. It aims to create an easy path for independent software vendors to integrate Filecoin as a storage layer.
+The Filecoin REST API is an interface to easily propel data onto the Filecoin network. The REST API is implemented here in a service named 'motion'. This service aims to create an easy path for independent software vendors to integrate Filecoin as a storage layer.
 
 ## Install and setup
 
