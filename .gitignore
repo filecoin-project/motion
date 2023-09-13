@@ -1,4 +1,3 @@
-extern
 ./.env
 ./.env.local
 integration/test/devnet/data
