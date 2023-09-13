@@ -26,6 +26,22 @@ services:
       - 5432:5432
     logging: *default-logging
 
+  singularity_admin_init:
+    image: ghcr.io/data-preservation-programs/singularity:${SINGULARITY_TAG}
+    command: admin init
+    volumes:
+      - motion-singularity-volume:/usr/src/app/storage
+    ports:
+      - 9090:9090
+    environment:
+      DATABASE_CONNECTION_STRING: postgres://${SINGULARITY_DB_USER:-postgres}:${SINGULARITY_DB_PASSWORD:-postgres}@db:5432/${SINGULARITY_DB_NAME:-singularity}
+      LOTUS_TEST: 
+      LOTUS_API:
+      LOTUS_TOKEN:
+    depends_on:
+      db:
+        condition: service_healthy
+
   singularity_api:
     image: ghcr.io/data-preservation-programs/singularity:${SINGULARITY_TAG}
     command: run api --bind :9091
@@ -41,8 +57,8 @@ services:
       LOTUS_TOKEN:
     logging: *default-logging
     depends_on:
-      db:
-        condition: service_healthy
+      singularity_admin_init:
+        condition: service_completed_successfully
 
   singularity_dataset_worker:
     image: ghcr.io/data-preservation-programs/singularity:${SINGULARITY_TAG}
@@ -57,8 +73,8 @@ services:
       LOTUS_TOKEN:
     logging: *default-logging
     depends_on:
-      db:
-        condition: service_healthy
+      singularity_admin_init:
+        condition: service_completed_successfully
 
   singularity_deal_pusher:
     image: ghcr.io/data-preservation-programs/singularity:${SINGULARITY_TAG}
@@ -73,8 +89,8 @@ services:
       LOTUS_TOKEN:
     logging: *default-logging
     depends_on:
-      db:
-        condition: service_healthy
+      singularity_admin_init:
+        condition: service_completed_successfully
 
   singularity_deal_tracker:
     image: ghcr.io/data-preservation-programs/singularity:${SINGULARITY_TAG}
@@ -89,8 +105,8 @@ services:
       LOTUS_TOKEN:
     logging: *default-logging
     depends_on:
-      db:
-        condition: service_healthy
+      singularity_admin_init:
+        condition: service_completed_successfully
 
   singularity_content_provider:
     image: ghcr.io/data-preservation-programs/singularity:${SINGULARITY_TAG}
@@ -107,8 +123,8 @@ services:
       LOTUS_TOKEN:
     logging: *default-logging
     depends_on:
-      db:
-        condition: service_healthy
+      singularity_admin_init:
+        condition: service_completed_successfully
 
   motion:
     build:
