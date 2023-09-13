@@ -37,7 +37,7 @@ jobs:
       - name: Await Lotus full node startup
         run: |
           cd integration/test/devnet
-          docker compose exec lotus lotus wait-api --timeout=10m
+          docker compose exec lotus lotus wait-api --timeout=20m
       - name: Set up Motion Wallet and API endpoints
         run: |
           cd integration/test/devnet
