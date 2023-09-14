@@ -6,13 +6,14 @@ import (
 	"fmt"
 	"io"
 
+	singularityclient "github.com/data-preservation-programs/singularity/client/swagger/http"
 	"github.com/data-preservation-programs/singularity/client/swagger/http/file"
 	"github.com/gotidy/ptr"
 )
 
 // io.ReadSeekCloser implementation that reads from remote singularity
 type SingularityReader struct {
-	store  *SingularityStore
+	client *singularityclient.SingularityAPI
 	fileID uint64
 	offset int64
 	size   int64
@@ -35,7 +36,7 @@ func (r *SingularityReader) Read(p []byte) (int, error) {
 		readLen = remainingBytes
 	}
 
-	_, _, err := r.store.singularityClient.File.RetrieveFile(&file.RetrieveFileParams{
+	_, _, err := r.client.File.RetrieveFile(&file.RetrieveFileParams{
 		Context: context.Background(),
 		ID:      int64(r.fileID),
 		Range:   ptr.String(fmt.Sprintf("bytes=%d-%d", r.offset, r.offset+readLen-1)),

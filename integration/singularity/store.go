@@ -394,7 +394,7 @@ func (s *SingularityStore) Get(ctx context.Context, id blob.ID) (io.ReadSeekClos
 	}
 
 	return &SingularityReader{
-		store:  s,
+		client: s.singularityClient,
 		fileID: fileID,
 		offset: 0,
 		size:   getFileRes.Payload.Size,
