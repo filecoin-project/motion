@@ -192,20 +192,49 @@ func (l *SingularityStore) Start(ctx context.Context) error {
 	pricePerGB, _ := (new(big.Rat).SetFrac(l.pricePerGiB.Int, big.NewInt(int64(1e18)))).Float64()
 	pricePerDeal, _ := (new(big.Rat).SetFrac(l.pricePerDeal.Int, big.NewInt(int64(1e18)))).Float64()
 
-	logger.Info("Checking %v storage providers", len(l.storageProviders))
+	logger.Infof("Checking %v storage providers", len(l.storageProviders))
 	for _, sp := range l.storageProviders {
-		logger.Info("Checking storage provider %s", sp)
-		var foundSchedule bool
+		var foundSchedule *models.ModelSchedule
 		logger := logger.With("provider", sp)
 		for _, schd := range listPreparationSchedulesRes.Payload {
 			scheduleAddr, err := address.NewFromString(schd.Provider)
 			if err == nil && sp == scheduleAddr {
-				foundSchedule = true
-				logger.Infow("Schedule found for provider", "id", schd.ID)
+				foundSchedule = schd
 				break
 			}
 		}
-		if !foundSchedule {
+		if foundSchedule != nil {
+			// If schedule was found, update it
+			logger.Infow("Schedule found for provider. Updating with latest settings...", "id", foundSchedule.ID)
+			_, err := l.singularityClient.DealSchedule.UpdateSchedule(&deal_schedule.UpdateScheduleParams{
+				Context: ctx,
+				ID:      foundSchedule.ID,
+				Body: &models.ScheduleUpdateRequest{
+					PricePerGbEpoch:       pricePerGBEpoch,
+					PricePerGb:            pricePerGB,
+					PricePerDeal:          pricePerDeal,
+					Verified:              &l.verifiedDeal,
+					Ipni:                  &l.ipniAnnounce,
+					KeepUnsealed:          &l.keepUnsealed,
+					StartDelay:            ptr.String(strconv.Itoa(int(l.dealStartDelay)*builtin.EpochDurationSeconds) + "s"),
+					Duration:              ptr.String(strconv.Itoa(int(l.dealDuration)*builtin.EpochDurationSeconds) + "s"),
+					ScheduleCron:          l.scheduleCron,
+					ScheduleCronPerpetual: l.scheduleCronPerpetual,
+					ScheduleDealNumber:    int64(l.scheduleDealNumber),
+					TotalDealNumber:       int64(l.totalDealNumber),
+					ScheduleDealSize:      l.scheduleDealSize,
+					TotalDealSize:         l.totalDealSize,
+					MaxPendingDealSize:    l.maxPendingDealSize,
+					MaxPendingDealNumber:  int64(l.maxPendingDealNumber),
+					URLTemplate:           l.scheduleUrlTemplate,
+				},
+			})
+			if err != nil {
+				logger.Errorw("Failed to update schedule for provider", "err", err)
+				return fmt.Errorf("failed to update schedule: %w", err)
+			}
+		} else {
+			// Otherwise, create it
 			logger.Info("Schedule not found for provider. Creating...")
 			if createScheduleRes, err := l.singularityClient.DealSchedule.CreateSchedule(&deal_schedule.CreateScheduleParams{
 				Context: ctx,
@@ -236,8 +265,6 @@ func (l *SingularityStore) Start(ctx context.Context) error {
 			} else {
 				logger.Infow("Successfully created schedule for provider", "id", createScheduleRes.Payload.ID)
 			}
-		} else {
-			logger.Infow("Found schedule")
 		}
 	}
 	go l.runPreparationJobs()
