@@ -2,6 +2,7 @@ package singularity
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"math/big"
@@ -9,6 +10,8 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"sync/atomic"
+	"time"
 
 	"github.com/data-preservation-programs/singularity/client/swagger/http/deal_schedule"
 	"github.com/data-preservation-programs/singularity/client/swagger/http/file"
@@ -30,11 +33,12 @@ var logger = log.Logger("motion/integration/singularity")
 
 type SingularityStore struct {
 	*options
-	local      *blob.LocalStore
-	sourceName string
-	toPack     chan uint64
-	closing    chan struct{}
-	closed     chan struct{}
+	local         *blob.LocalStore
+	sourceName    string
+	toPack        chan uint64
+	closing       chan struct{}
+	closed        chan struct{}
+	cleanupActive atomic.Bool
 }
 
 func NewStore(o ...Option) (*SingularityStore, error) {
@@ -43,14 +47,16 @@ func NewStore(o ...Option) (*SingularityStore, error) {
 		logger.Errorw("Failed to instantiate options", "err", err)
 		return nil, err
 	}
-	return &SingularityStore{
+	s := &SingularityStore{
 		options:    opts,
 		local:      blob.NewLocalStore(opts.storeDir),
 		sourceName: "source",
 		toPack:     make(chan uint64, 16),
 		closing:    make(chan struct{}),
 		closed:     make(chan struct{}),
-	}, nil
+	}
+	go s.runCleanupWorker(context.Background())
+	return s, nil
 }
 
 func (l *SingularityStore) initPreparation(ctx context.Context) (*models.ModelPreparation, error) {
@@ -456,4 +462,107 @@ func (s *SingularityStore) Describe(ctx context.Context, id blob.ID) (*blob.Desc
 		Replicas: replicas,
 	}
 	return descriptor, nil
+}
+
+func (s *SingularityStore) runCleanupWorker(ctx context.Context) {
+	go func() {
+		ticker := time.NewTicker(s.cleanupInterval)
+	cleanupLoop:
+		for {
+			select {
+			case <-ticker.C:
+				go func() {
+					s.cleanup(context.Background())
+				}()
+			case <-s.closing:
+				break cleanupLoop
+			}
+		}
+	}()
+}
+
+var errCleanupAlreadyRunning = errors.New("cleanup already running")
+
+func (s *SingularityStore) cleanup(ctx context.Context) error {
+	if s.cleanupActive.Load() {
+		return errCleanupAlreadyRunning
+	}
+
+	// Mark cleanup active for the duration of the function
+	s.cleanupActive.Store(true)
+	defer s.cleanupActive.Store(false)
+
+	logger.Infof("Starting local store cleanup...")
+
+	dir, err := os.ReadDir(s.local.Dir())
+	if err != nil {
+		return fmt.Errorf("failed to open local store directory: %w", err)
+	}
+
+	var binsToDelete []string
+
+binIteration:
+	for _, entry := range dir {
+		binFileName := entry.Name()
+
+		id, entryIsBin := strings.CutSuffix(binFileName, ".bin")
+		if !entryIsBin {
+			continue
+		}
+
+		idFileName := id + ".id"
+		idStream, err := os.Open(path.Join(s.local.Dir(), idFileName))
+		if err != nil {
+			logger.Warnf("Failed to open ID map file for %s: %w", id, err)
+			continue
+		}
+		fileIDString, err := io.ReadAll(idStream)
+		if err != nil {
+			logger.Warnf("Failed to read ID map file for %s: %w", id, err)
+			continue
+		}
+		fileID, err := strconv.ParseUint(string(fileIDString), 10, 64)
+		if err != nil {
+			logger.Warnf("Failed to parse file ID %s as integer: %w", fileIDString, err)
+			continue
+		}
+
+		getFileDealsRes, err := s.singularityClient.File.GetFileDeals(&file.GetFileDealsParams{
+			Context: ctx,
+			ID:      int64(fileID),
+		})
+		if err != nil {
+			logger.Warnf("Failed to get file deals for %v: %w", fileID, err)
+			continue
+		}
+
+		// Make sure the file has a deal for every SP
+		for _, deal := range getFileDealsRes.Payload {
+			var foundDealForSP bool
+			for _, sp := range s.storageProviders {
+				if deal.Provider == sp.String() {
+					foundDealForSP = true
+					break
+				}
+			}
+
+			if !foundDealForSP {
+				// If no deal was found for this file and SP, the local bin file
+				// cannot be deleted yet - continue to the next one
+				continue binIteration
+			}
+		}
+
+		// If deals have been made for all SPs, the local bin file can be
+		// deleted
+		binsToDelete = append(binsToDelete, binFileName)
+	}
+
+	for _, binFileName := range binsToDelete {
+		if err := os.Remove(binFileName); err != nil {
+			logger.Warnf("Failed to delete local bin file %s that was staged for removal: %w", binFileName, err)
+		}
+	}
+
+	return nil
 }

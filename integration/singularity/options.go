@@ -3,6 +3,7 @@ package singularity
 import (
 	"errors"
 	"os"
+	"time"
 
 	singularityclient "github.com/data-preservation-programs/singularity/client/swagger/http"
 	"github.com/filecoin-project/go-address"
@@ -39,6 +40,7 @@ type (
 		totalDealSize         string
 		maxPendingDealSize    string
 		maxPendingDealNumber  int
+		cleanupInterval       time.Duration
 	}
 )
 
@@ -57,6 +59,7 @@ func newOptions(o ...Option) (*options, error) {
 		totalDealSize:         "0",
 		maxPendingDealSize:    "0",
 		maxPendingDealNumber:  0,
+		cleanupInterval:       time.Hour,
 	}
 	for _, apply := range o {
 		if err := apply(opts); err != nil {
@@ -301,6 +304,15 @@ func WithMaxPendingDealSize(v string) Option {
 func WithMaxPendingDealNumber(v int) Option {
 	return func(o *options) error {
 		o.maxPendingDealNumber = v
+		return nil
+	}
+}
+
+// WithCleanupInterval sets how often to check for and remove data that has been successfully stored on Filecoin.
+// Deafults to time.Hour
+func WithCleanupInterval(v time.Duration) Option {
+	return func(o *options) error {
+		o.cleanupInterval = v
 		return nil
 	}
 }
