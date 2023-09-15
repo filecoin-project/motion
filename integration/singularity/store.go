@@ -206,7 +206,7 @@ func (l *SingularityStore) Start(ctx context.Context) error {
 		if foundSchedule != nil {
 			// If schedule was found, update it
 			logger.Infow("Schedule found for provider. Updating with latest settings...", "id", foundSchedule.ID)
-			l.singularityClient.DealSchedule.UpdateSchedule(&deal_schedule.UpdateScheduleParams{
+			_, err := l.singularityClient.DealSchedule.UpdateSchedule(&deal_schedule.UpdateScheduleParams{
 				Context: ctx,
 				ID:      foundSchedule.ID,
 				Body: &models.ScheduleUpdateRequest{
@@ -229,6 +229,10 @@ func (l *SingularityStore) Start(ctx context.Context) error {
 					URLTemplate:           l.scheduleUrlTemplate,
 				},
 			})
+			if err != nil {
+				logger.Errorw("Failed to update schedule for provider", "err", err)
+				return fmt.Errorf("failed to update schedule: %w", err)
+			}
 		} else {
 			// Otherwise, create it
 			logger.Info("Schedule not found for provider. Creating...")
