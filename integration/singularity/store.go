@@ -200,7 +200,8 @@ func (l *SingularityStore) Start(ctx context.Context) error {
 
 	logger.Infof("Checking %v storage providers", len(l.storageProviders))
 	for _, sp := range l.storageProviders {
-		var foundSchedule *models.ModelSchedule
+		logger.Infof("Checking storage provider %s", sp)
+		var foundSchedule bool
 		logger := logger.With("provider", sp)
 		for _, schd := range listPreparationSchedulesRes.Payload {
 			scheduleAddr, err := address.NewFromString(schd.Provider)
@@ -465,20 +466,27 @@ func (s *SingularityStore) Describe(ctx context.Context, id blob.ID) (*blob.Desc
 }
 
 func (s *SingularityStore) runCleanupWorker(ctx context.Context) {
+	// Run immediately once before starting ticker
 	go func() {
-		ticker := time.NewTicker(s.cleanupInterval)
-	cleanupLoop:
-		for {
-			select {
-			case <-ticker.C:
-				go func() {
-					s.cleanup(context.Background())
-				}()
-			case <-s.closing:
-				break cleanupLoop
-			}
+		if err := s.cleanup(context.Background()); err != nil {
+			logger.Errorf("Local store cleanup failed: %w", err)
 		}
 	}()
+
+	ticker := time.NewTicker(s.localCleanupInterval)
+cleanupLoop:
+	for {
+		select {
+		case <-ticker.C:
+			go func() {
+				if err := s.cleanup(context.Background()); err != nil {
+					logger.Errorf("Local store cleanup failed: %w", err)
+				}
+			}()
+		case <-s.closing:
+			break cleanupLoop
+		}
+	}
 }
 
 var errCleanupAlreadyRunning = errors.New("cleanup already running")
@@ -513,17 +521,17 @@ binIteration:
 		idFileName := id + ".id"
 		idStream, err := os.Open(path.Join(s.local.Dir(), idFileName))
 		if err != nil {
-			logger.Warnf("Failed to open ID map file for %s: %w", id, err)
+			logger.Warnf("Failed to open ID map file for %s: %v", id, err)
 			continue
 		}
 		fileIDString, err := io.ReadAll(idStream)
 		if err != nil {
-			logger.Warnf("Failed to read ID map file for %s: %w", id, err)
+			logger.Warnf("Failed to read ID map file for %s: %v", id, err)
 			continue
 		}
 		fileID, err := strconv.ParseUint(string(fileIDString), 10, 64)
 		if err != nil {
-			logger.Warnf("Failed to parse file ID %s as integer: %w", fileIDString, err)
+			logger.Warnf("Failed to parse file ID %s as integer: %v", fileIDString, err)
 			continue
 		}
 
@@ -532,7 +540,7 @@ binIteration:
 			ID:      int64(fileID),
 		})
 		if err != nil {
-			logger.Warnf("Failed to get file deals for %v: %w", fileID, err)
+			logger.Warnf("Failed to get file deals for %v: %v", fileID, err)
 			continue
 		}
 
@@ -559,10 +567,11 @@ binIteration:
 	}
 
 	for _, binFileName := range binsToDelete {
-		if err := os.Remove(binFileName); err != nil {
-			logger.Warnf("Failed to delete local bin file %s that was staged for removal: %w", binFileName, err)
+		if err := os.Remove(path.Join(s.local.Dir(), binFileName)); err != nil {
+			logger.Warnf("Failed to delete local bin file %s that was staged for removal: %v", binFileName, err)
 		}
 	}
+	logger.Infof("Cleaned up %v unneeded local files", len(binsToDelete))
 
 	return nil
 }

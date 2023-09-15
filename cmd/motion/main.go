@@ -156,6 +156,12 @@ func main() {
 				Value:       1,
 				EnvVars:     []string{"MOTION_SINGULARITY_SCHEDULE_DEAL_NUMBER"},
 			},
+			&cli.DurationFlag{
+				Name:    "experimentalSingularityCleanupInterval",
+				Usage:   "How often to check for and delete files from the local store that have already had deals made",
+				Value:   time.Hour,
+				EnvVars: []string{"MOTION_SINGULARITY_LOCAL_CLEANUP_INTERVAL"},
+			},
 		},
 		Action: func(cctx *cli.Context) error {
 			storeDir := cctx.String("storeDir")
@@ -200,6 +206,7 @@ func main() {
 					singularity.WithScheduleCron(cctx.String("experimentalSingularityScheduleCron")),
 					singularity.WithScheduleDealNumber(cctx.Int("experimentalSingularityScheduleDealNumber")),
 					singularity.WithVerifiedDeal(cctx.Bool("verifiedDeal")),
+					singularity.WithLocalCleanupInterval(cctx.Duration("experimentalSingularityCleanupInterval")),
 				)
 				if err != nil {
 					logger.Errorw("Failed to instantiate singularity store", "err", err)
