@@ -192,7 +192,7 @@ func (l *SingularityStore) Start(ctx context.Context) error {
 	pricePerGB, _ := (new(big.Rat).SetFrac(l.pricePerGiB.Int, big.NewInt(int64(1e18)))).Float64()
 	pricePerDeal, _ := (new(big.Rat).SetFrac(l.pricePerDeal.Int, big.NewInt(int64(1e18)))).Float64()
 
-	logger.Info("Checking %v storage providers", len(l.storageProviders))
+	logger.Infof("Checking %v storage providers", len(l.storageProviders))
 	for _, sp := range l.storageProviders {
 		var foundSchedule *models.ModelSchedule
 		logger := logger.With("provider", sp)
