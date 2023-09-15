@@ -369,8 +369,6 @@ func (s *SingularityStore) Put(ctx context.Context, reader io.ReadCloser) (*blob
 }
 
 func (s *SingularityStore) Get(ctx context.Context, id blob.ID) (io.ReadSeekCloser, error) {
-	// this is largely artificial -- we're verifying the singularity item, but just reading from
-	// the local store
 	idStream, err := os.Open(path.Join(s.local.Dir(), id.String()+".id"))
 	if err != nil {
 		return nil, err
@@ -394,12 +392,13 @@ func (s *SingularityStore) Get(ctx context.Context, id blob.ID) (io.ReadSeekClos
 
 		return nil, fmt.Errorf("error loading singularity entry: %w", err)
 	}
-	var decoded blob.ID
-	err = decoded.Decode(strings.TrimSuffix(path.Base(getFileRes.Payload.Path), path.Ext(getFileRes.Payload.Path)))
-	if err != nil {
-		return nil, err
-	}
-	return s.local.Get(ctx, decoded)
+
+	return &SingularityReader{
+		client: s.singularityClient,
+		fileID: fileID,
+		offset: 0,
+		size:   getFileRes.Payload.Size,
+	}, nil
 }
 
 func (s *SingularityStore) Describe(ctx context.Context, id blob.ID) (*blob.Descriptor, error) {

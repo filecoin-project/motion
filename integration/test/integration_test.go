@@ -19,8 +19,12 @@ import (
 func TestRoundTripPutAndGet(t *testing.T) {
 	env := NewEnvironment(t)
 
-	wantBlob := []byte("fish")
-	buf := bytes.NewBuffer(wantBlob)
+	buf := new(bytes.Buffer)
+	for i := 0; i < 10000000; i++ {
+		_, err := buf.Write([]byte("1234567890"))
+		require.NoError(t, err)
+	}
+	wantBlob := buf.Bytes()
 
 	var postBlobResp api.PostBlobResponse
 	{
