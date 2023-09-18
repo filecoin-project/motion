@@ -2,7 +2,6 @@ package singularity
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"math/big"
@@ -10,7 +9,6 @@ import (
 	"path"
 	"strconv"
 	"strings"
-	"sync/atomic"
 	"time"
 
 	"github.com/data-preservation-programs/singularity/client/swagger/http/deal_schedule"
@@ -33,12 +31,11 @@ var logger = log.Logger("motion/integration/singularity")
 
 type SingularityStore struct {
 	*options
-	local         *blob.LocalStore
-	sourceName    string
-	toPack        chan uint64
-	closing       chan struct{}
-	closed        chan struct{}
-	cleanupActive atomic.Bool
+	local      *blob.LocalStore
+	sourceName string
+	toPack     chan uint64
+	closing    chan struct{}
+	closed     chan struct{}
 }
 
 func NewStore(o ...Option) (*SingularityStore, error) {
@@ -465,37 +462,26 @@ func (s *SingularityStore) Describe(ctx context.Context, id blob.ID) (*blob.Desc
 
 func (s *SingularityStore) runCleanupWorker(ctx context.Context) {
 	// Run immediately once before starting ticker
-	s.tryStartCleanupJob()
+	s.runCleanupJob()
 
 	ticker := time.NewTicker(s.cleanupInterval)
 	for {
 		select {
 		case <-ticker.C:
-			s.tryStartCleanupJob()
+			s.runCleanupJob()
 		case <-s.closing:
 			return
 		}
 	}
 }
 
-func (s *SingularityStore) tryStartCleanupJob() {
-	go func() {
-		if err := s.cleanup(context.Background()); err != nil {
-			logger.Errorf("Local store cleanup failed: %w", err)
-		}
-	}()
+func (s *SingularityStore) runCleanupJob() {
+	if err := s.cleanup(context.Background()); err != nil {
+		logger.Errorf("Local store cleanup failed: %w", err)
+	}
 }
 
-var errCleanupAlreadyRunning = errors.New("cleanup already running")
-
 func (s *SingularityStore) cleanup(ctx context.Context) error {
-	if s.cleanupActive.Load() {
-		return errCleanupAlreadyRunning
-	}
-
-	// Mark cleanup active for the duration of the function
-	s.cleanupActive.Store(true)
-	defer s.cleanupActive.Store(false)
 
 	logger.Infof("Starting local store cleanup...")
 
