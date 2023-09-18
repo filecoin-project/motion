@@ -40,7 +40,7 @@ type (
 		totalDealSize         string
 		maxPendingDealSize    string
 		maxPendingDealNumber  int
-		localCleanupInterval  time.Duration
+		cleanupInterval       time.Duration
 	}
 )
 
@@ -59,7 +59,7 @@ func newOptions(o ...Option) (*options, error) {
 		totalDealSize:         "0",
 		maxPendingDealSize:    "0",
 		maxPendingDealNumber:  0,
-		localCleanupInterval:  time.Hour,
+		cleanupInterval:       time.Hour,
 	}
 	for _, apply := range o {
 		if err := apply(opts); err != nil {
@@ -308,11 +308,11 @@ func WithMaxPendingDealNumber(v int) Option {
 	}
 }
 
-// WithLocalCleanupInterval sets how often to check for and remove data that has been successfully stored on Filecoin.
+// WithCleanupInterval sets how often to check for and remove data that has been successfully stored on Filecoin.
 // Deafults to time.Hour
-func WithLocalCleanupInterval(v time.Duration) Option {
+func WithCleanupInterval(v time.Duration) Option {
 	return func(o *options) error {
-		o.localCleanupInterval = v
+		o.cleanupInterval = v
 		return nil
 	}
 }

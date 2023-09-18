@@ -206,7 +206,7 @@ func main() {
 					singularity.WithScheduleCron(cctx.String("experimentalSingularityScheduleCron")),
 					singularity.WithScheduleDealNumber(cctx.Int("experimentalSingularityScheduleDealNumber")),
 					singularity.WithVerifiedDeal(cctx.Bool("verifiedDeal")),
-					singularity.WithLocalCleanupInterval(cctx.Duration("experimentalSingularityCleanupInterval")),
+					singularity.WithCleanupInterval(cctx.Duration("experimentalSingularityCleanupInterval")),
 				)
 				if err != nil {
 					logger.Errorw("Failed to instantiate singularity store", "err", err)

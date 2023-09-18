@@ -472,7 +472,7 @@ func (s *SingularityStore) runCleanupWorker(ctx context.Context) {
 		}
 	}()
 
-	ticker := time.NewTicker(s.localCleanupInterval)
+	ticker := time.NewTicker(s.cleanupInterval)
 cleanupLoop:
 	for {
 		select {
