@@ -20,8 +20,6 @@ type SingularityReader struct {
 }
 
 func (r *SingularityReader) Read(p []byte) (int, error) {
-	logger.Infof("buffer size: %v", len(p))
-
 	buf := bytes.NewBuffer(p)
 	buf.Reset()
 
