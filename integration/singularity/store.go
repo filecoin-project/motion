@@ -47,16 +47,14 @@ func NewStore(o ...Option) (*SingularityStore, error) {
 		logger.Errorw("Failed to instantiate options", "err", err)
 		return nil, err
 	}
-	s := &SingularityStore{
+	return &SingularityStore{
 		options:    opts,
 		local:      blob.NewLocalStore(opts.storeDir),
 		sourceName: "source",
 		toPack:     make(chan uint64, 16),
 		closing:    make(chan struct{}),
 		closed:     make(chan struct{}),
-	}
-	go s.runCleanupWorker(context.Background())
-	return s, nil
+	}, nil
 }
 
 func (l *SingularityStore) initPreparation(ctx context.Context) (*models.ModelPreparation, error) {
@@ -275,6 +273,7 @@ func (l *SingularityStore) Start(ctx context.Context) error {
 		}
 	}
 	go l.runPreparationJobs()
+	go l.runCleanupWorker(context.Background())
 	return nil
 }
 
