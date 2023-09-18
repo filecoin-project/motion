@@ -402,7 +402,6 @@ func (s *SingularityStore) Get(ctx context.Context, id blob.ID) (io.ReadSeekClos
 	return &SingularityReader{
 		client: s.singularityClient,
 		fileID: fileID,
-		offset: 0,
 		size:   getFileRes.Payload.Size,
 	}, nil
 }
@@ -466,26 +465,25 @@ func (s *SingularityStore) Describe(ctx context.Context, id blob.ID) (*blob.Desc
 
 func (s *SingularityStore) runCleanupWorker(ctx context.Context) {
 	// Run immediately once before starting ticker
+	s.tryStartCleanupJob()
+
+	ticker := time.NewTicker(s.cleanupInterval)
+	for {
+		select {
+		case <-ticker.C:
+			s.tryStartCleanupJob()
+		case <-s.closing:
+			return
+		}
+	}
+}
+
+func (s *SingularityStore) tryStartCleanupJob() {
 	go func() {
 		if err := s.cleanup(context.Background()); err != nil {
 			logger.Errorf("Local store cleanup failed: %w", err)
 		}
 	}()
-
-	ticker := time.NewTicker(s.cleanupInterval)
-cleanupLoop:
-	for {
-		select {
-		case <-ticker.C:
-			go func() {
-				if err := s.cleanup(context.Background()); err != nil {
-					logger.Errorf("Local store cleanup failed: %w", err)
-				}
-			}()
-		case <-s.closing:
-			break cleanupLoop
-		}
-	}
 }
 
 var errCleanupAlreadyRunning = errors.New("cleanup already running")
