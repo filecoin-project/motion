@@ -20,12 +20,12 @@ type SingularityReader struct {
 }
 
 func (r *SingularityReader) Read(p []byte) (int, error) {
-	buf := bytes.NewBuffer(p)
-	buf.Reset()
-
 	if r.offset >= r.size {
 		return 0, io.EOF
 	}
+
+	buf := bytes.NewBuffer(p)
+	buf.Reset()
 
 	// Figure out how many bytes to read
 	readLen := int64(len(p))
