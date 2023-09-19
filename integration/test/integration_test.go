@@ -2,6 +2,7 @@ package test
 
 import (
 	"bytes"
+	"crypto/rand"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -19,12 +20,9 @@ import (
 func TestRoundTripPutAndGet(t *testing.T) {
 	env := NewEnvironment(t)
 
-	buf := new(bytes.Buffer)
-	for i := 0; i < 10000000; i++ {
-		_, err := buf.Write([]byte("1234567890"))
-		require.NoError(t, err)
-	}
-	wantBlob := buf.Bytes()
+	wantBlob, err := io.ReadAll(io.LimitReader(rand.Reader, 10<<20))
+	require.NoError(t, err)
+	buf := bytes.NewBuffer(wantBlob)
 
 	var postBlobResp api.PostBlobResponse
 	{

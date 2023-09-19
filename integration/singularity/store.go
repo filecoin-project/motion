@@ -196,7 +196,7 @@ func (l *SingularityStore) Start(ctx context.Context) error {
 	logger.Infof("Checking %v storage providers", len(l.storageProviders))
 	for _, sp := range l.storageProviders {
 		logger.Infof("Checking storage provider %s", sp)
-		var foundSchedule bool
+		var foundSchedule *models.ModelSchedule
 		logger := logger.With("provider", sp)
 		for _, schd := range listPreparationSchedulesRes.Payload {
 			scheduleAddr, err := address.NewFromString(schd.Provider)
