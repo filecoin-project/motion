@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/signal"
@@ -217,6 +218,11 @@ func main() {
 					logger.Errorw("Failed to start Singularity blob store", "err", err)
 					return err
 				}
+				defer func() {
+					if err := singularityStore.Shutdown(context.Background()); err != nil {
+						logger.Errorw("Failed to shut down Singularity blob store", "err", err)
+					}
+				}()
 				store = singularityStore
 			} else {
 				store = blob.NewLocalStore(storeDir)

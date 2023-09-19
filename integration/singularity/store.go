@@ -9,6 +9,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/data-preservation-programs/singularity/client/swagger/http/deal_schedule"
@@ -35,7 +36,7 @@ type SingularityStore struct {
 	sourceName string
 	toPack     chan uint64
 	closing    chan struct{}
-	closed     chan struct{}
+	closed     sync.WaitGroup
 }
 
 func NewStore(o ...Option) (*SingularityStore, error) {
@@ -50,7 +51,6 @@ func NewStore(o ...Option) (*SingularityStore, error) {
 		sourceName: "source",
 		toPack:     make(chan uint64, 16),
 		closing:    make(chan struct{}),
-		closed:     make(chan struct{}),
 	}, nil
 }
 
@@ -275,14 +275,16 @@ func (l *SingularityStore) Start(ctx context.Context) error {
 }
 
 func (l *SingularityStore) runPreparationJobs() {
+	l.closed.Add(1)
+
 	ctx := context.Background()
 	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	defer func() {
+		cancel()
+		l.closed.Done()
+	}()
 
 	go func() {
-		defer func() {
-			close(l.closed)
-		}()
 		for {
 			select {
 			case <-ctx.Done():
@@ -309,15 +311,24 @@ func (l *SingularityStore) runPreparationJobs() {
 			}
 		}
 	}()
-	<-l.closing
 }
 
 func (l *SingularityStore) Shutdown(ctx context.Context) error {
 	close(l.closing)
+
+	done := make(chan struct{})
+	go func() {
+		l.closed.Wait()
+		close(done)
+	}()
+
 	select {
 	case <-ctx.Done():
-	case <-l.closed:
+	case <-done:
 	}
+
+	logger.Infof("Singularity store shut down")
+
 	return nil
 }
 
@@ -461,6 +472,9 @@ func (s *SingularityStore) Describe(ctx context.Context, id blob.ID) (*blob.Desc
 }
 
 func (s *SingularityStore) runCleanupWorker(ctx context.Context) {
+	s.closed.Add(1)
+	defer s.closed.Done()
+
 	// Run immediately once before starting ticker
 	s.runCleanupJob()
 
