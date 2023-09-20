@@ -9,6 +9,8 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/data-preservation-programs/singularity/client/swagger/http/deal_schedule"
 	"github.com/data-preservation-programs/singularity/client/swagger/http/file"
@@ -34,7 +36,7 @@ type SingularityStore struct {
 	sourceName string
 	toPack     chan uint64
 	closing    chan struct{}
-	closed     chan struct{}
+	closed     sync.WaitGroup
 }
 
 func NewStore(o ...Option) (*SingularityStore, error) {
@@ -49,7 +51,6 @@ func NewStore(o ...Option) (*SingularityStore, error) {
 		sourceName: "source",
 		toPack:     make(chan uint64, 16),
 		closing:    make(chan struct{}),
-		closed:     make(chan struct{}),
 	}, nil
 }
 
@@ -194,6 +195,7 @@ func (l *SingularityStore) Start(ctx context.Context) error {
 
 	logger.Infof("Checking %v storage providers", len(l.storageProviders))
 	for _, sp := range l.storageProviders {
+		logger.Infof("Checking storage provider %s", sp)
 		var foundSchedule *models.ModelSchedule
 		logger := logger.With("provider", sp)
 		for _, schd := range listPreparationSchedulesRes.Payload {
@@ -268,18 +270,21 @@ func (l *SingularityStore) Start(ctx context.Context) error {
 		}
 	}
 	go l.runPreparationJobs()
+	go l.runCleanupWorker(context.Background())
 	return nil
 }
 
 func (l *SingularityStore) runPreparationJobs() {
+	l.closed.Add(1)
+
 	ctx := context.Background()
 	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	defer func() {
+		cancel()
+		l.closed.Done()
+	}()
 
 	go func() {
-		defer func() {
-			close(l.closed)
-		}()
 		for {
 			select {
 			case <-ctx.Done():
@@ -306,15 +311,24 @@ func (l *SingularityStore) runPreparationJobs() {
 			}
 		}
 	}()
-	<-l.closing
 }
 
 func (l *SingularityStore) Shutdown(ctx context.Context) error {
 	close(l.closing)
+
+	done := make(chan struct{})
+	go func() {
+		l.closed.Wait()
+		close(done)
+	}()
+
 	select {
 	case <-ctx.Done():
-	case <-l.closed:
+	case <-done:
 	}
+
+	logger.Infof("Singularity store shut down")
+
 	return nil
 }
 
@@ -396,7 +410,6 @@ func (s *SingularityStore) Get(ctx context.Context, id blob.ID) (io.ReadSeekClos
 	return &SingularityReader{
 		client: s.singularityClient,
 		fileID: fileID,
-		offset: 0,
 		size:   getFileRes.Payload.Size,
 	}, nil
 }
@@ -456,4 +469,106 @@ func (s *SingularityStore) Describe(ctx context.Context, id blob.ID) (*blob.Desc
 		Replicas: replicas,
 	}
 	return descriptor, nil
+}
+
+func (s *SingularityStore) runCleanupWorker(ctx context.Context) {
+	s.closed.Add(1)
+	defer s.closed.Done()
+
+	// Run immediately once before starting ticker
+	s.runCleanupJob()
+
+	ticker := time.NewTicker(s.cleanupInterval)
+	for {
+		select {
+		case <-ticker.C:
+			s.runCleanupJob()
+		case <-s.closing:
+			return
+		}
+	}
+}
+
+func (s *SingularityStore) runCleanupJob() {
+	if err := s.cleanup(context.Background()); err != nil {
+		logger.Errorf("Local store cleanup failed: %w", err)
+	}
+}
+
+func (s *SingularityStore) cleanup(ctx context.Context) error {
+
+	logger.Infof("Starting local store cleanup...")
+
+	dir, err := os.ReadDir(s.local.Dir())
+	if err != nil {
+		return fmt.Errorf("failed to open local store directory: %w", err)
+	}
+
+	var binsToDelete []string
+
+binIteration:
+	for _, entry := range dir {
+		binFileName := entry.Name()
+
+		id, entryIsBin := strings.CutSuffix(binFileName, ".bin")
+		if !entryIsBin {
+			continue
+		}
+
+		idFileName := id + ".id"
+		idStream, err := os.Open(path.Join(s.local.Dir(), idFileName))
+		if err != nil {
+			logger.Warnf("Failed to open ID map file for %s: %v", id, err)
+			continue
+		}
+		fileIDString, err := io.ReadAll(idStream)
+		if err != nil {
+			logger.Warnf("Failed to read ID map file for %s: %v", id, err)
+			continue
+		}
+		fileID, err := strconv.ParseUint(string(fileIDString), 10, 64)
+		if err != nil {
+			logger.Warnf("Failed to parse file ID %s as integer: %v", fileIDString, err)
+			continue
+		}
+
+		getFileDealsRes, err := s.singularityClient.File.GetFileDeals(&file.GetFileDealsParams{
+			Context: ctx,
+			ID:      int64(fileID),
+		})
+		if err != nil {
+			logger.Warnf("Failed to get file deals for %v: %v", fileID, err)
+			continue
+		}
+
+		// Make sure the file has at least 1 deal for every SP
+		for _, sp := range s.storageProviders {
+			var foundDealForSP bool
+			for _, deal := range getFileDealsRes.Payload {
+				if deal.Provider == sp.String() {
+					foundDealForSP = true
+					break
+				}
+			}
+
+			if !foundDealForSP {
+				// If no deal was found for this file and SP, the local bin file
+				// cannot be deleted yet - continue to the next one
+				continue binIteration
+			}
+		}
+
+		// If deals have been made for all SPs, the local bin file can be
+		// deleted
+		binsToDelete = append(binsToDelete, binFileName)
+	}
+
+	for _, binFileName := range binsToDelete {
+		if err := os.Remove(path.Join(s.local.Dir(), binFileName)); err != nil {
+			logger.Warnf("Failed to delete local bin file %s that was staged for removal: %v", binFileName, err)
+		}
+	}
+	logger.Infof("Cleaned up %v unneeded local files", len(binsToDelete))
+
+	return nil
 }
