@@ -541,10 +541,10 @@ binIteration:
 			continue
 		}
 
-		// Make sure the file has a deal for every SP
-		for _, deal := range getFileDealsRes.Payload {
+		// Make sure the file has at least 1 deal for every SP
+		for _, sp := range s.storageProviders {
 			var foundDealForSP bool
-			for _, sp := range s.storageProviders {
+			for _, deal := range getFileDealsRes.Payload {
 				if deal.Provider == sp.String() {
 					foundDealForSP = true
 					break
