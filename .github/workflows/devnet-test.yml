@@ -40,22 +40,7 @@ jobs:
           docker compose exec lotus lotus wait-api --timeout=20m
       - name: Set up Motion Wallet and API endpoints
         run: |
-          cd integration/test/devnet
-          # Setup Lotus API token
-          export `docker compose exec lotus lotus auth api-info --perm=admin`
-          IFS=: read -r token path <<< "${FULLNODE_API_INFO}"
-          echo "LOTUS_TOKEN=${token}" >> $GITHUB_ENV
-          
-          # Setup Motion Wallet
-          MOTION_WALLET_ADDR=`docker compose exec lotus lotus wallet new`
-          MOTION_WALLET_KEY=`docker compose exec lotus lotus wallet export ${MOTION_WALLET_ADDR}`
-          LOTUS_WALLET_DEFAULT_ADDR=`docker compose exec lotus lotus wallet default`
-          docker compose exec lotus lotus send --from=${LOTUS_WALLET_DEFAULT_ADDR} ${MOTION_WALLET_ADDR} 10
-          echo "MOTION_WALLET_ADDR=${MOTION_WALLET_ADDR}" >> $GITHUB_ENV
-          echo "MOTION_WALLET_KEY=${MOTION_WALLET_KEY}" >> $GITHUB_ENV
-          echo "MOTION_STORAGE_PROVIDERS=t01000" >> $GITHUB_ENV
-          echo "MOTION_API_ENDPOINT=http://localhost:40080" >> $GITHUB_ENV
-          echo "SINGULARITY_API_ENDPOINT=http://localhost:9091" >> $GITHUB_ENV
+          ./scripts/integration-setup.sh "${GITHUB_ENV}"
       - name: Run Motionlarity
         run: |
           cd integration/test/motionlarity
