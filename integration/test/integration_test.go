@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/rand"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -76,6 +77,7 @@ func TestRoundTripPutAndStatus(t *testing.T) {
 			var decoded api.GetStatusResponse
 			err = jsonResp.Decode(&decoded)
 			assert.NoError(c, err)
+			fmt.Println(decoded)
 			assert.Greater(c, len(decoded.Replicas), 0)
 		}, 2*time.Minute, 5*time.Second, "never initiated deal making")
 	}

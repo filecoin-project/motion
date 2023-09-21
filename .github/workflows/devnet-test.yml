@@ -9,7 +9,7 @@ on:
 jobs:
   build:
     name: Boost Devnet
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-4-cores
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -30,34 +30,10 @@ jobs:
             ${{ runner.os }}-build-${{ env.cache-name }}-
             ${{ runner.os }}-build-
             ${{ runner.os }}-
-      - name: Run Boost Devnet from pre-built images
+      - name: Run Motion Integration Tests
         run: |
-          cd integration/test/devnet
-          docker compose up -d
-      - name: Await Lotus full node startup
-        run: |
-          cd integration/test/devnet
-          docker compose exec lotus lotus wait-api --timeout=20m
-      - name: Set up Motion Wallet and API endpoints
-        run: |
-          ./scripts/integration-setup.sh "${GITHUB_ENV}"
-      - name: Run Motionlarity
-        run: |
-          cd integration/test/motionlarity
-          docker compose up -d
-      - name: Wait until motion is running
-        uses: nick-fields/retry@v2
-        with:
-          timeout_seconds: 5
-          max_attempts: 10
-          retry_on: error
-          command: |
-            cd integration/test/motionlarity
-            docker compose ps --services --filter "status=running" | grep motion
-      - name: Run Motion integration tests
-        env:
-          MOTION_INTEGRATION_TEST: 'true'
-        run: go test ./integration/test -v
+          cd integration/test
+          make test
       - name: Start S3 Connector
         run: |
           cd integration/test/s3-connector

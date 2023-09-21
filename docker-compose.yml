@@ -23,8 +23,6 @@ services:
     command: admin init
     volumes:
       - motion-singularity-volume:/usr/src/app/storage
-    ports:
-      - 9090:9090
     environment:
       DATABASE_CONNECTION_STRING: postgres://${SINGULARITY_DB_USER:-postgres}:${SINGULARITY_DB_PASSWORD:-postgres}@db:5432/${SINGULARITY_DB_NAME:-singularity}
       LOTUS_TEST: 
