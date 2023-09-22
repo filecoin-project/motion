@@ -1,4 +1,4 @@
-# :motorcycle: Filecoin REST API
+# :motorcycle: DeStor REST API for Filecoin
 
 *Accelerating data onto Filecoin!*
 
@@ -14,17 +14,16 @@
 
 ## Background
 
-The Filecoin REST API is an interface to easily propel data onto the Filecoin network. The REST API is implemented here in a service named 'motion'. This service aims to create an easy path for independent software vendors to integrate Filecoin as a storage layer.
+The DeStor REST API for Filecoin is an interface to easily propel data onto the Filecoin network. The REST API is implemented here in a service named 'motion'. This service aims to create an easy path for independent software vendors to integrate Filecoin as a storage layer.
 
 ## Install and setup
 
 ### Prerequisites
 
-1. A list of storage providers who have agreed to store data for you on Filecoin, with whom you've obtained contracts to specify terms of storage. Work with a Motion account manager to help set these up. If you are simply testing, your account manager can offer sample providers to test with.
 
-2. A Filecoin wallet to make deals with, for which you are in possession of the private key. Various options for obtaining a wallet can be found here (https://docs.filecoin.io/basics/assets/wallets/). Your Motion account manager may be able to offer a test wallet to use during a testing phase.
+1. A Filecoin wallet to make deals with, for which you are in possession of the private key. Various options for obtaining a wallet can be found here (https://docs.filecoin.io/basics/assets/wallets/). 
 
-3. A server (bare metal or VM) to run Motion on, with Docker Engine installed on that server with the Docker Compose plugin included. Recommended hardware requirements for servers are:
+2. A server (bare metal or VM) to run Motion on, with Docker Engine installed on that server with the Docker Compose plugin included. Recommended hardware requirements for servers are:
 - Because we run docker, Linux variants are preferred for the OS
 - Recommend at least >500GB disk space available for staging data. The complete Filecoin deal making process takes up to 3 days, and you will need to hold all data until deal making is complete. So the amount of free space you will need is roughly the amount of data you want to onboard per day times 3.
 - In general, we do not believe Motion is processor or memory intensive, but a machine with at least 32GB of RAM is optimal
@@ -67,7 +66,7 @@ MOTION_WALLET_KEY=
 SINGULARITY_CONTENT_PROVIDER_DOMAIN=
 ```
 
-Again, work with your Motion account manager to choose your storage providers, obtain a wallet, and for assistance setting up your server to expose a port for data transfers publicly on your server.
+Again, you could open an issue if you need assistance setting up your wallet, your server to expose a port for data transfers publicly on your server.
 
 As needed, you can also set additional values in your motion `.env`` file for more custom configurations.
 
