@@ -455,7 +455,6 @@ func (s *SingularityStore) Describe(ctx context.Context, id blob.ID) (*blob.Desc
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println(getFileDealsRes.Payload)
 	replicas := make([]blob.Replica, 0, len(getFileDealsRes.Payload))
 	for _, deal := range getFileDealsRes.Payload {
 		replicas = append(replicas, blob.Replica{

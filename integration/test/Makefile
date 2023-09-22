@@ -28,6 +28,7 @@ devnet/down: motionlarity/down
 	rm ./devnet/.up || true
 
 ./motionlarity/.up: ./motionlarity/.env.local ./devnet/.boostready
+	./buildsingularity.sh
 	echo "Run Motionlarity"
 	docker compose -f ./motionlarity/docker-compose.yaml --env-file ./motionlarity/.env.local up -d
 	./waitmotion.sh
