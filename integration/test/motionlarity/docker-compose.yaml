@@ -94,13 +94,14 @@ services:
     image: ghcr.io/data-preservation-programs/singularity:${SINGULARITY_TAG}
     volumes:
       - motion-singularity-volume:/usr/src/app/storage
-    command: run deal-tracker
+    command: run deal-tracker -i 1000000000
     restart: unless-stopped
     environment:
       DATABASE_CONNECTION_STRING: postgres://${SINGULARITY_DB_USER:-postgres}:${SINGULARITY_DB_PASSWORD:-postgres}@db:5432/${SINGULARITY_DB_NAME:-singularity}
       LOTUS_TEST:
       LOTUS_API:
       LOTUS_TOKEN:
+      MARKET_DEAL_URL:
     logging: *default-logging
     depends_on:
       singularity_admin_init:

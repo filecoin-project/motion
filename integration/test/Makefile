@@ -43,4 +43,4 @@ motionlarity/down:
 
 test: motionlarity/up
 	echo "Run Motion integration tests"
-	MOTION_INTEGRATION_TEST='true' go test . -v
+	MOTION_INTEGRATION_TEST='true' go test . -v --count=1
