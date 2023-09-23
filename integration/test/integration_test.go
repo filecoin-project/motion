@@ -68,7 +68,10 @@ func TestRoundTripPutAndGet(t *testing.T) {
 func TestRoundTripPutStatusAndFullStorage(t *testing.T) {
 	env := NewEnvironment(t)
 	// make an 8MB random file -- to trigger at least one car generation
-	dataReader := io.LimitReader(rand.Reader, 8*(1<<20))
+
+	wantBlob, err := io.ReadAll(io.LimitReader(rand.Reader, 8<<20))
+	require.NoError(t, err)
+	buf := bytes.NewBuffer(wantBlob)
 
 	// force boost to clear any publishable deals from singularity
 	t.Log("clearing boost publish queue")
@@ -82,7 +85,7 @@ func TestRoundTripPutStatusAndFullStorage(t *testing.T) {
 	var postBlobResp api.PostBlobResponse
 	t.Log("posting 8MB data into motion")
 	{
-		postResp, err := http.Post(requireJoinUrlPath(t, env.MotionAPIEndpoint, "v0", "blob"), "application/octet-stream", dataReader)
+		postResp, err := http.Post(requireJoinUrlPath(t, env.MotionAPIEndpoint, "v0", "blob"), "application/octet-stream", buf)
 		require.NoError(t, err)
 		defer func() { require.NoError(t, postResp.Body.Close()) }()
 		require.EqualValues(t, http.StatusCreated, postResp.StatusCode)
@@ -153,8 +156,19 @@ func TestRoundTripPutStatusAndFullStorage(t *testing.T) {
 	}
 
 	// this is just to allow the cleanup worker to run
-	t.Log("sleeping for 5 seconds to allow cleanup worker to run")
-	time.Sleep(5 * time.Second)
+	t.Log("sleeping for 1 minute to allow cleanup worker to run, and indexing to complete")
+	time.Sleep(1 * time.Minute)
+
+	var gotBlob []byte
+	{
+		getResp, err := http.Get(requireJoinUrlPath(t, env.MotionAPIEndpoint, "v0", "blob", postBlobResp.ID))
+		require.NoError(t, err)
+		defer func() { require.NoError(t, getResp.Body.Close()) }()
+		require.EqualValues(t, http.StatusOK, getResp.StatusCode)
+		gotBlob, err = io.ReadAll(getResp.Body)
+		require.NoError(t, err)
+	}
+	require.Equal(t, wantBlob, gotBlob)
 }
 
 func requireJoinUrlPath(t *testing.T, base string, elem ...string) string {

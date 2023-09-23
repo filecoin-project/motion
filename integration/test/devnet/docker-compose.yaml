@@ -82,6 +82,7 @@ services:
       - ./data/lotus:/var/lib/lotus:ro
       - ./data/lotus-miner:/var/lib/lotus-miner:ro
       - ./data/sample:/app/public:rw
+      - ./entrypoints/boost:/app:rw
 
   booster-http:
     platform: linux/amd64
