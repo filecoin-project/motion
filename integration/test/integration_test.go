@@ -31,47 +31,29 @@ type BoostPublishQuery struct {
 	Data BoostPublishQueryData `json:"data"`
 }
 
-// TODO: Expand test cases to assert singularity store start-up operations, e.g.:
-//         * motion dataset exists
-//         * schedules are created
-
-func TestRoundTripPutAndGet(t *testing.T) {
-	env := NewEnvironment(t)
-
-	wantBlob, err := io.ReadAll(io.LimitReader(rand.Reader, 10<<20))
-	require.NoError(t, err)
-	buf := bytes.NewBuffer(wantBlob)
-
-	var postBlobResp api.PostBlobResponse
-	{
-		postResp, err := http.Post(requireJoinUrlPath(t, env.MotionAPIEndpoint, "v0", "blob"), "application/octet-stream", buf)
-		require.NoError(t, err)
-		defer func() { require.NoError(t, postResp.Body.Close()) }()
-		require.EqualValues(t, http.StatusCreated, postResp.StatusCode)
-		require.NoError(t, json.NewDecoder(postResp.Body).Decode(&postBlobResp))
-		t.Log(postBlobResp)
-		require.NotEmpty(t, postBlobResp.ID)
-	}
-
-	var gotBlob []byte
-	{
-		getResp, err := http.Get(requireJoinUrlPath(t, env.MotionAPIEndpoint, "v0", "blob", postBlobResp.ID))
-		require.NoError(t, err)
-		defer func() { require.NoError(t, getResp.Body.Close()) }()
-		require.EqualValues(t, http.StatusOK, getResp.StatusCode)
-		gotBlob, err = io.ReadAll(getResp.Body)
-		require.NoError(t, err)
-	}
-	require.Equal(t, wantBlob, gotBlob)
-}
-
 func TestRoundTripPutStatusAndFullStorage(t *testing.T) {
 	env := NewEnvironment(t)
-	// make an 8MB random file -- to trigger at least one car generation
 
+	// make an 8MB random file -- to trigger at least one car generation
 	wantBlob, err := io.ReadAll(io.LimitReader(rand.Reader, 8<<20))
 	require.NoError(t, err)
 	buf := bytes.NewBuffer(wantBlob)
+
+	// find out how many deals we're starting with
+	t.Log("check existing deals")
+	var existingDeals int
+	{
+		req, err := http.NewRequest("GET", "http://localhost:8080/graphql/query", strings.NewReader("{\"operationName\":\"AppDealPublishQuery\",\"variables\":{},\"query\":\"query AppDealPublishQuery {  dealPublish {   Deals {      ID  __typename    }    __typename  }}\"}"))
+		require.NoError(t, err)
+		getResp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		require.EqualValues(t, http.StatusOK, getResp.StatusCode)
+		decoder := json.NewDecoder(getResp.Body)
+		var bpq BoostPublishQuery
+		err = decoder.Decode(&bpq)
+		require.NoError(t, err)
+		existingDeals = len(bpq.Data.DealPublish.Deals)
+	}
 
 	// force boost to clear any publishable deals from singularity
 	t.Log("clearing boost publish queue")
@@ -93,6 +75,18 @@ func TestRoundTripPutStatusAndFullStorage(t *testing.T) {
 		t.Log(postBlobResp)
 		require.NotEmpty(t, postBlobResp.ID)
 	}
+
+	var gotBlob []byte
+	t.Log("requesting data back while still in source storage")
+	{
+		getResp, err := http.Get(requireJoinUrlPath(t, env.MotionAPIEndpoint, "v0", "blob", postBlobResp.ID))
+		require.NoError(t, err)
+		defer func() { require.NoError(t, getResp.Body.Close()) }()
+		require.EqualValues(t, http.StatusOK, getResp.StatusCode)
+		gotBlob, err = io.ReadAll(getResp.Body)
+		require.NoError(t, err)
+	}
+	require.Equal(t, wantBlob, gotBlob)
 
 	// get the status, and continue to check until we verify a deal was at least proposed through boost
 	t.Log("waiting for singularity to make deals with boost")
@@ -122,7 +116,7 @@ func TestRoundTripPutStatusAndFullStorage(t *testing.T) {
 			decoder := json.NewDecoder(getResp.Body)
 			var bpq BoostPublishQuery
 			decoder.Decode(&bpq)
-			assert.Len(c, bpq.Data.DealPublish.Deals, 2)
+			assert.Len(c, bpq.Data.DealPublish.Deals, existingDeals+2)
 		}, 2*time.Minute, 5*time.Second, "never finished data transfer")
 	}
 
@@ -159,7 +153,6 @@ func TestRoundTripPutStatusAndFullStorage(t *testing.T) {
 	t.Log("sleeping for 1 minute to allow cleanup worker to run, and indexing to complete")
 	time.Sleep(1 * time.Minute)
 
-	var gotBlob []byte
 	{
 		getResp, err := http.Get(requireJoinUrlPath(t, env.MotionAPIEndpoint, "v0", "blob", postBlobResp.ID))
 		require.NoError(t, err)

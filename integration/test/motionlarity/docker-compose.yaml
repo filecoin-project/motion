@@ -27,7 +27,7 @@ services:
     logging: *default-logging
 
   singularity_admin_init:
-    image: ghcr.io/data-preservation-programs/singularity:${SINGULARITY_TAG}
+    image: ghcr.io/data-preservation-programs/singularity${SINGULARITY_REF}
     command: admin init
     volumes:
       - motion-singularity-volume:/usr/src/app/storage
@@ -41,7 +41,7 @@ services:
         condition: service_healthy
 
   singularity_api:
-    image: ghcr.io/data-preservation-programs/singularity:${SINGULARITY_TAG}
+    image: ghcr.io/data-preservation-programs/singularity${SINGULARITY_REF}
     command: run api --bind :9091
     volumes:
       - motion-singularity-volume:/usr/src/app/storage
@@ -59,7 +59,7 @@ services:
         condition: service_completed_successfully
 
   singularity_dataset_worker:
-    image: ghcr.io/data-preservation-programs/singularity:${SINGULARITY_TAG}
+    image: ghcr.io/data-preservation-programs/singularity${SINGULARITY_REF}
     volumes:
       - motion-singularity-volume:/usr/src/app/storage
     command: run dataset-worker --min-interval 1s --max-interval 5s
@@ -75,7 +75,7 @@ services:
         condition: service_completed_successfully
 
   singularity_deal_pusher:
-    image: ghcr.io/data-preservation-programs/singularity:${SINGULARITY_TAG}
+    image: ghcr.io/data-preservation-programs/singularity${SINGULARITY_REF}
     volumes:
       - motion-singularity-volume:/usr/src/app/storage
     command: run deal-pusher
@@ -91,7 +91,7 @@ services:
         condition: service_completed_successfully
 
   singularity_deal_tracker:
-    image: ghcr.io/data-preservation-programs/singularity:${SINGULARITY_TAG}
+    image: ghcr.io/data-preservation-programs/singularity${SINGULARITY_REF}
     volumes:
       - motion-singularity-volume:/usr/src/app/storage
     command: run deal-tracker -i 1s
@@ -108,7 +108,7 @@ services:
         condition: service_completed_successfully
 
   singularity_content_provider:
-    image: ghcr.io/data-preservation-programs/singularity:${SINGULARITY_TAG}
+    image: ghcr.io/data-preservation-programs/singularity${SINGULARITY_REF}
     command: run content-provider --http-bind :7778
     volumes:
       - motion-singularity-volume:/usr/src/app/storage
