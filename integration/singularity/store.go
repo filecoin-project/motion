@@ -468,10 +468,10 @@ func (s *SingularityStore) Describe(ctx context.Context, id blob.ID) (*blob.Desc
 		}
 
 		replicas = append(replicas, blob.Replica{
-			LastVerified: updatedAt,
-			Provider:     deal.Provider,
-			Status:       string(deal.State),
-			Expiration:   epochutil.EpochToTime(int32(deal.EndEpoch)),
+			LastUpdated: updatedAt,
+			Provider:    deal.Provider,
+			Status:      string(deal.State),
+			Expiration:  epochutil.EpochToTime(int32(deal.EndEpoch)),
 		})
 	}
 	descriptor.Status = &blob.Status{

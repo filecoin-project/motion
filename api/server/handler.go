@@ -158,7 +158,7 @@ func (m *HttpServer) handleBlobGetStatusByID(w http.ResponseWriter, r *http.Requ
 			response.Replicas = append(response.Replicas, api.Replica{
 				Provider:     replica.Provider,
 				Status:       replica.Status,
-				LastVerified: replica.LastVerified,
+				LastVerified: replica.LastUpdated,
 				Expiration:   replica.Expiration,
 			})
 		}
