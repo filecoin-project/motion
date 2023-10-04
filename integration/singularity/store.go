@@ -30,6 +30,8 @@ import (
 
 var logger = log.Logger("motion/integration/singularity")
 
+const PutQueueSize = 16
+
 type SingularityStore struct {
 	*options
 	local      *blob.LocalStore
@@ -49,7 +51,7 @@ func NewStore(o ...Option) (*SingularityStore, error) {
 		options:    opts,
 		local:      blob.NewLocalStore(opts.storeDir),
 		sourceName: "source",
-		toPack:     make(chan uint64, 16),
+		toPack:     make(chan uint64, PutQueueSize),
 		closing:    make(chan struct{}),
 	}, nil
 }
@@ -189,6 +191,7 @@ func (l *SingularityStore) Start(ctx context.Context) error {
 		logger.Errorw("Failed to list schedules for preparation", "err", err)
 		return err
 	}
+
 	pricePerGBEpoch, _ := (new(big.Rat).SetFrac(l.pricePerGiBEpoch.Int, big.NewInt(int64(1e18)))).Float64()
 	pricePerGB, _ := (new(big.Rat).SetFrac(l.pricePerGiB.Int, big.NewInt(int64(1e18)))).Float64()
 	pricePerDeal, _ := (new(big.Rat).SetFrac(l.pricePerDeal.Int, big.NewInt(int64(1e18)))).Float64()
@@ -270,7 +273,7 @@ func (l *SingularityStore) Start(ctx context.Context) error {
 		}
 	}
 	go l.runPreparationJobs()
-	go l.runCleanupWorker(context.Background())
+	go l.runCleanupWorker()
 	return nil
 }
 
@@ -280,11 +283,11 @@ func (l *SingularityStore) runPreparationJobs() {
 
 	// Create a context that gets canceled when this function exits.
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	for {
 		select {
 		case <-l.closing:
-			cancel()
 			return
 		case fileID := <-l.toPack:
 			prepareToPackSourceRes, err := l.singularityClient.File.PrepareToPackFile(&file.PrepareToPackFileParams{
@@ -467,7 +470,7 @@ func (s *SingularityStore) Describe(ctx context.Context, id blob.ID) (*blob.Desc
 	return descriptor, nil
 }
 
-func (s *SingularityStore) runCleanupWorker(ctx context.Context) {
+func (s *SingularityStore) runCleanupWorker() {
 	s.closed.Add(1)
 	defer s.closed.Done()
 
@@ -475,6 +478,8 @@ func (s *SingularityStore) runCleanupWorker(ctx context.Context) {
 	s.runCleanupJob()
 
 	ticker := time.NewTicker(s.cleanupInterval)
+	defer ticker.Stop()
+
 	for {
 		select {
 		case <-ticker.C:
@@ -492,7 +497,6 @@ func (s *SingularityStore) runCleanupJob() {
 }
 
 func (s *SingularityStore) cleanup(ctx context.Context) error {
-
 	logger.Infof("Starting local store cleanup...")
 
 	dir, err := os.ReadDir(s.local.Dir())
