@@ -30,6 +30,8 @@ import (
 
 var logger = log.Logger("motion/integration/singularity")
 
+const PutQueueSize = 16
+
 type SingularityStore struct {
 	*options
 	local      *blob.LocalStore
@@ -49,7 +51,7 @@ func NewStore(o ...Option) (*SingularityStore, error) {
 		options:    opts,
 		local:      blob.NewLocalStore(opts.storeDir),
 		sourceName: "source",
-		toPack:     make(chan uint64, 16),
+		toPack:     make(chan uint64, PutQueueSize),
 		closing:    make(chan struct{}),
 	}, nil
 }
@@ -189,6 +191,7 @@ func (l *SingularityStore) Start(ctx context.Context) error {
 		logger.Errorw("Failed to list schedules for preparation", "err", err)
 		return err
 	}
+
 	pricePerGBEpoch, _ := (new(big.Rat).SetFrac(l.pricePerGiBEpoch.Int, big.NewInt(int64(1e18)))).Float64()
 	pricePerGB, _ := (new(big.Rat).SetFrac(l.pricePerGiB.Int, big.NewInt(int64(1e18)))).Float64()
 	pricePerDeal, _ := (new(big.Rat).SetFrac(l.pricePerDeal.Int, big.NewInt(int64(1e18)))).Float64()
@@ -270,47 +273,43 @@ func (l *SingularityStore) Start(ctx context.Context) error {
 		}
 	}
 	go l.runPreparationJobs()
-	go l.runCleanupWorker(context.Background())
+	go l.runCleanupWorker()
 	return nil
 }
 
 func (l *SingularityStore) runPreparationJobs() {
 	l.closed.Add(1)
+	defer l.closed.Done()
 
-	ctx := context.Background()
-	ctx, cancel := context.WithCancel(ctx)
-	defer func() {
-		cancel()
-		l.closed.Done()
-	}()
+	// Create a context that gets canceled when this function exits.
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case fileID := <-l.toPack:
-				prepareToPackSourceRes, err := l.singularityClient.File.PrepareToPackFile(&file.PrepareToPackFileParams{
+	for {
+		select {
+		case <-l.closing:
+			return
+		case fileID := <-l.toPack:
+			prepareToPackSourceRes, err := l.singularityClient.File.PrepareToPackFile(&file.PrepareToPackFileParams{
+				Context: ctx,
+				ID:      int64(fileID),
+			})
+			if err != nil {
+				logger.Errorw("preparing to pack file", "fileID", fileID, "error", err)
+			}
+			if prepareToPackSourceRes.Payload > l.packThreshold {
+				// mark outstanding pack jobs as ready to go so we can make CAR files
+				_, err := l.singularityClient.Job.PrepareToPackSource(&job.PrepareToPackSourceParams{
 					Context: ctx,
-					ID:      int64(fileID),
+					ID:      l.preparationName,
+					Name:    l.sourceName,
 				})
 				if err != nil {
-					logger.Errorw("preparing to pack file", "fileID", fileID, "error", err)
-				}
-				if prepareToPackSourceRes.Payload > l.packThreshold {
-					// mark outstanding pack jobs as ready to go so we can make CAR files
-					_, err := l.singularityClient.Job.PrepareToPackSource(&job.PrepareToPackSourceParams{
-						Context: ctx,
-						ID:      l.preparationName,
-						Name:    l.sourceName,
-					})
-					if err != nil {
-						logger.Errorw("preparing to pack source", "error", err)
-					}
+					logger.Errorw("preparing to pack source", "error", err)
 				}
 			}
 		}
-	}()
+	}
 }
 
 func (l *SingularityStore) Shutdown(ctx context.Context) error {
@@ -471,7 +470,7 @@ func (s *SingularityStore) Describe(ctx context.Context, id blob.ID) (*blob.Desc
 	return descriptor, nil
 }
 
-func (s *SingularityStore) runCleanupWorker(ctx context.Context) {
+func (s *SingularityStore) runCleanupWorker() {
 	s.closed.Add(1)
 	defer s.closed.Done()
 
@@ -479,6 +478,8 @@ func (s *SingularityStore) runCleanupWorker(ctx context.Context) {
 	s.runCleanupJob()
 
 	ticker := time.NewTicker(s.cleanupInterval)
+	defer ticker.Stop()
+
 	for {
 		select {
 		case <-ticker.C:
@@ -496,7 +497,6 @@ func (s *SingularityStore) runCleanupJob() {
 }
 
 func (s *SingularityStore) cleanup(ctx context.Context) error {
-
 	logger.Infof("Starting local store cleanup...")
 
 	dir, err := os.ReadDir(s.local.Dir())

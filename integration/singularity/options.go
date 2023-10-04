@@ -60,6 +60,9 @@ func newOptions(o ...Option) (*options, error) {
 		maxPendingDealSize:    "0",
 		maxPendingDealNumber:  0,
 		cleanupInterval:       time.Hour,
+		pricePerGiBEpoch:      abi.NewTokenAmount(0),
+		pricePerGiB:           abi.NewTokenAmount(0),
+		pricePerDeal:          abi.NewTokenAmount(0),
 	}
 	for _, apply := range o {
 		if err := apply(opts); err != nil {
