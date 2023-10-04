@@ -276,16 +276,15 @@ func (l *SingularityStore) Start(ctx context.Context) error {
 
 func (l *SingularityStore) runPreparationJobs() {
 	l.closed.Add(1)
+	defer l.closed.Done()
 
+	// Create a context that gets canceled when this function exits.
 	ctx, cancel := context.WithCancel(context.Background())
-	defer func() {
-		cancel()
-		l.closed.Done()
-	}()
 
 	for {
 		select {
-		case <-ctx.Done():
+		case <-l.closing:
+			cancel()
 			return
 		case fileID := <-l.toPack:
 			prepareToPackSourceRes, err := l.singularityClient.File.PrepareToPackFile(&file.PrepareToPackFileParams{
