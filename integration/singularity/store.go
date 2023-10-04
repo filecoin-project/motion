@@ -277,40 +277,37 @@ func (l *SingularityStore) Start(ctx context.Context) error {
 func (l *SingularityStore) runPreparationJobs() {
 	l.closed.Add(1)
 
-	ctx := context.Background()
-	ctx, cancel := context.WithCancel(ctx)
+	ctx, cancel := context.WithCancel(context.Background())
 	defer func() {
 		cancel()
 		l.closed.Done()
 	}()
 
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case fileID := <-l.toPack:
-				prepareToPackSourceRes, err := l.singularityClient.File.PrepareToPackFile(&file.PrepareToPackFileParams{
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case fileID := <-l.toPack:
+			prepareToPackSourceRes, err := l.singularityClient.File.PrepareToPackFile(&file.PrepareToPackFileParams{
+				Context: ctx,
+				ID:      int64(fileID),
+			})
+			if err != nil {
+				logger.Errorw("preparing to pack file", "fileID", fileID, "error", err)
+			}
+			if prepareToPackSourceRes.Payload > l.packThreshold {
+				// mark outstanding pack jobs as ready to go so we can make CAR files
+				_, err := l.singularityClient.Job.PrepareToPackSource(&job.PrepareToPackSourceParams{
 					Context: ctx,
-					ID:      int64(fileID),
+					ID:      l.preparationName,
+					Name:    l.sourceName,
 				})
 				if err != nil {
-					logger.Errorw("preparing to pack file", "fileID", fileID, "error", err)
-				}
-				if prepareToPackSourceRes.Payload > l.packThreshold {
-					// mark outstanding pack jobs as ready to go so we can make CAR files
-					_, err := l.singularityClient.Job.PrepareToPackSource(&job.PrepareToPackSourceParams{
-						Context: ctx,
-						ID:      l.preparationName,
-						Name:    l.sourceName,
-					})
-					if err != nil {
-						logger.Errorw("preparing to pack source", "error", err)
-					}
+					logger.Errorw("preparing to pack source", "error", err)
 				}
 			}
 		}
-	}()
+	}
 }
 
 func (l *SingularityStore) Shutdown(ctx context.Context) error {
