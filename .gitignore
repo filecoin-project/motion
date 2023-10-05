@@ -2,3 +2,7 @@
 /.env.local
 integration/test/devnet/data
 motion
+integration/test/motionlarity/.env.local
+integration/test/motionlarity/.up
+integration/test/devnet/.up
+integration/test/devnet/.boostready

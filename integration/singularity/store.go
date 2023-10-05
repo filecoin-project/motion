@@ -444,9 +444,10 @@ func (s *SingularityStore) Describe(ctx context.Context, id blob.ID) (*blob.Desc
 	if err != nil {
 		return nil, err
 	}
-	descriptor, err := s.local.Describe(ctx, decoded)
-	if err != nil {
-		return nil, err
+	descriptor := &blob.Descriptor{
+		ID:               id,
+		Size:             uint64(getFileRes.Payload.Size),
+		ModificationTime: time.Unix(0, getFileRes.Payload.LastModifiedNano),
 	}
 	getFileDealsRes, err := s.singularityClient.File.GetFileDeals(&file.GetFileDealsParams{
 		Context: ctx,
@@ -545,7 +546,7 @@ binIteration:
 		for _, sp := range s.storageProviders {
 			var foundDealForSP bool
 			for _, deal := range getFileDealsRes.Payload {
-				if deal.Provider == sp.String() {
+				if deal.Provider == sp.String() && (deal.State == models.ModelDealStatePublished || deal.State == models.ModelDealStateActive) {
 					foundDealForSP = true
 					break
 				}
@@ -560,6 +561,7 @@ binIteration:
 
 		// If deals have been made for all SPs, the local bin file can be
 		// deleted
+		logger.Infof("deleting local copy for deal %s, file %s", id, binFileName)
 		binsToDelete = append(binsToDelete, binFileName)
 	}
 
