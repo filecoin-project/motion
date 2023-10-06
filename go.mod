@@ -11,6 +11,7 @@ require (
 	github.com/ipfs/go-log/v2 v2.5.1
 	github.com/stretchr/testify v1.8.4
 	github.com/urfave/cli/v2 v2.25.7
+	go.uber.org/goleak v1.2.0
 )
 
 require (
