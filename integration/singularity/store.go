@@ -462,11 +462,16 @@ func (s *SingularityStore) Describe(ctx context.Context, id blob.ID) (*blob.Desc
 	}
 	replicas := make([]blob.Replica, 0, len(getFileDealsRes.Payload))
 	for _, deal := range getFileDealsRes.Payload {
+		updatedAt, err := time.Parse("2006-01-02 15:04:05-07:00", deal.UpdatedAt)
+		if err != nil {
+			updatedAt = time.Time{}
+		}
+
 		replicas = append(replicas, blob.Replica{
-			// TODO: figure out how to get LastVerified
-			Provider:   deal.Provider,
-			Status:     string(deal.State),
-			Expiration: epochutil.EpochToTime(int32(deal.EndEpoch)),
+			LastUpdated: updatedAt,
+			Provider:    deal.Provider,
+			Status:      string(deal.State),
+			Expiration:  epochutil.EpochToTime(int32(deal.EndEpoch)),
 		})
 	}
 	descriptor.Status = &blob.Status{

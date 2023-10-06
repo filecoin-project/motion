@@ -36,10 +36,10 @@ type (
 		Replicas []Replica
 	}
 	Replica struct {
-		Provider     string
-		Status       string
-		LastVerified time.Time
-		Expiration   time.Time
+		Provider    string
+		Status      string
+		LastUpdated time.Time
+		Expiration  time.Time
 	}
 	Store interface {
 		Put(context.Context, io.ReadCloser) (*Descriptor, error)
