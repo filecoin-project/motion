@@ -13,9 +13,21 @@ import (
 	singularityclient "github.com/data-preservation-programs/singularity/client/swagger/http"
 	"github.com/filecoin-project/motion/integration/singularity"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/goleak"
 )
 
+func checkGoLeaks(t *testing.T) {
+	// Ignore goroutines that are already running.
+	ignoreCurrent := goleak.IgnoreCurrent()
+	// Check if new goroutines are still running at end of test.
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, ignoreCurrent)
+	})
+}
+
 func TestStorePut(t *testing.T) {
+	checkGoLeaks(t)
+
 	testServer := httptest.NewServer(http.HandlerFunc(testHandler))
 	t.Cleanup(func() {
 		testServer.Close()
