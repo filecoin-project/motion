@@ -460,22 +460,25 @@ func (s *SingularityStore) Describe(ctx context.Context, id blob.ID) (*blob.Desc
 	if err != nil {
 		return nil, err
 	}
-	replicas := make([]blob.Replica, 0, len(getFileDealsRes.Payload))
+	pieces := make([]blob.Piece, 0, len(getFileDealsRes.Payload))
 	for _, deal := range getFileDealsRes.Payload {
 		updatedAt, err := time.Parse("2006-01-02 15:04:05-07:00", deal.UpdatedAt)
 		if err != nil {
 			updatedAt = time.Time{}
 		}
 
-		replicas = append(replicas, blob.Replica{
-			LastUpdated: updatedAt,
-			Provider:    deal.Provider,
-			Status:      string(deal.State),
+		pieces = append(pieces, blob.Piece{
 			Expiration:  epochutil.EpochToTime(int32(deal.EndEpoch)),
+			LastUpdated: updatedAt,
+			PieceCID:    deal.PieceCid,
+			Status:      string(deal.State),
 		})
 	}
-	descriptor.Status = &blob.Status{
-		Replicas: replicas,
+	if len(pieces) != 0 {
+		descriptor.Replica = &blob.Replica{
+			Provider: getFileDealsRes.Payload[0].Provider,
+			Pieces:   pieces,
+		}
 	}
 	return descriptor, nil
 }

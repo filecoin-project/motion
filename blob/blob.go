@@ -30,17 +30,21 @@ type (
 		Size uint64
 		// ModificationTime is the latest time at which the blob was modified.
 		ModificationTime time.Time
-		Status           *Status
+		Replica          *Replica
 	}
-	Status struct {
-		Replicas []Replica
-	}
-	Replica struct {
-		Provider    string
-		Status      string
-		LastUpdated time.Time
+
+	Piece struct {
 		Expiration  time.Time
+		LastUpdated time.Time
+		PieceCID    string
+		Status      string
 	}
+
+	Replica struct {
+		Provider string
+		Pieces   []Piece
+	}
+
 	Store interface {
 		Put(context.Context, io.ReadCloser) (*Descriptor, error)
 		Describe(context.Context, ID) (*Descriptor, error)
