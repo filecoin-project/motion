@@ -32,19 +32,16 @@ type (
 		ModificationTime time.Time
 		Replica          *Replica
 	}
-
+	Replica struct {
+		Provider string
+		Pieces   []Piece
+	}
 	Piece struct {
 		Expiration  time.Time
 		LastUpdated time.Time
 		PieceCID    string
 		Status      string
 	}
-
-	Replica struct {
-		Provider string
-		Pieces   []Piece
-	}
-
 	Store interface {
 		Put(context.Context, io.ReadCloser) (*Descriptor, error)
 		Describe(context.Context, ID) (*Descriptor, error)

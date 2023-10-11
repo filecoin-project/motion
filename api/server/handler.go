@@ -153,15 +153,18 @@ func (m *HttpServer) handleBlobGetStatusByID(w http.ResponseWriter, r *http.Requ
 	}
 
 	if blobDesc.Replica != nil && len(blobDesc.Replica.Pieces) != 0 {
-		response.Replicas = make([]api.Replica, 0, len(blobDesc.Replica.Pieces))
-		provider := blobDesc.Replica.Provider
+		apiPieces := make([]api.Piece, 0, len(blobDesc.Replica.Pieces))
 		for _, piece := range blobDesc.Replica.Pieces {
-			response.Replicas = append(response.Replicas, api.Replica{
-				Provider:     provider,
-				Status:       piece.Status,
-				LastVerified: piece.LastUpdated,
+			apiPieces = append(apiPieces, api.Piece{
 				Expiration:   piece.Expiration,
+				LastVerified: piece.LastUpdated,
+				PieceCID:     piece.PieceCID,
+				Status:       piece.Status,
 			})
+		}
+		response.Replica = &api.Replica{
+			Provider: blobDesc.Replica.Provider,
+			Pieces:   apiPieces,
 		}
 	}
 	respondWithJson(w, response, http.StatusOK)

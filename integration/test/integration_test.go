@@ -100,7 +100,8 @@ func TestRoundTripPutStatusAndFullStorage(t *testing.T) {
 			var decoded api.GetStatusResponse
 			err = jsonResp.Decode(&decoded)
 			assert.NoError(c, err)
-			assert.Equal(c, len(decoded.Replicas), 2)
+			assert.NotNil(c, decoded.Replica)
+			assert.Equal(c, len(decoded.Replica.Pieces), 2)
 		}, 2*time.Minute, 5*time.Second, "never initiated deal making")
 	}
 
@@ -142,9 +143,10 @@ func TestRoundTripPutStatusAndFullStorage(t *testing.T) {
 			var decoded api.GetStatusResponse
 			err = jsonResp.Decode(&decoded)
 			assert.NoError(c, err)
-			assert.Equal(c, len(decoded.Replicas), 2)
-			for _, replica := range decoded.Replicas {
-				assert.Contains(c, []string{"published", "active"}, replica.Status)
+			assert.NotNil(c, decoded.Replica)
+			assert.Equal(c, len(decoded.Replica.Pieces), 2)
+			for _, piece := range decoded.Replica.Pieces {
+				assert.Contains(c, []string{"published", "active"}, piece.Status)
 			}
 		}, 2*time.Minute, 5*time.Second, "published deals")
 	}
