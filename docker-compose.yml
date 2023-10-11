@@ -132,7 +132,7 @@ services:
       - motion-singularity-volume:/usr/src/app/storage
     depends_on:
       singularity_api:
-        condition: service_healthy
+        condition: service_completed_successfully
 
 volumes:
   motion-singularity-volume:
