@@ -30,8 +30,6 @@ import (
 
 var logger = log.Logger("motion/integration/singularity")
 
-const PutQueueSize = 16
-
 type SingularityStore struct {
 	*options
 	local      *blob.LocalStore
@@ -51,7 +49,7 @@ func NewStore(o ...Option) (*SingularityStore, error) {
 		options:    opts,
 		local:      blob.NewLocalStore(opts.storeDir),
 		sourceName: "source",
-		toPack:     make(chan uint64, PutQueueSize),
+		toPack:     make(chan uint64, 1),
 		closing:    make(chan struct{}),
 	}, nil
 }
