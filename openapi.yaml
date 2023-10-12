@@ -99,31 +99,33 @@ paths:
                   id:
                     type: string
                     description: 'ID associated with the blob.'
-                  replica:
-                    type: object
-                    properties:
-                      provider:
-                        type: string
-                        description: 'ID of the Filecoin storage provider.'
-                      pieces:
-                        type: array
-                        items:
-                          type: object
-                          properties:
-                            expiration:
-                              type: string
-                              format: date-time
-                              description: 'Expiration time of the blob storage. Follows the RFC 3339 format.'
-                            lastVerified:
-                              type: string
-                              format: date-time
-                              description: 'Last verification time of the replica. Follows the RFC 3339 format.'
-                            pieceCid:
-                              type: string
-                              description: 'Piece CID identifying this piece.'
-                            status:
-                              type: string
-                              description: 'Status of this replica. Can be "active", "slashed" or "expired".'
+                  replicas:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        provider:
+                          type: string
+                          description: 'ID of the Filecoin storage provider.'
+                        pieces:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              expiration:
+                                type: string
+                                format: date-time
+                                description: 'Expiration time of the blob storage. Follows the RFC 3339 format.'
+                              lastVerified:
+                                type: string
+                                format: date-time
+                                description: 'Last verification time of the replica. Follows the RFC 3339 format.'
+                              pieceCid:
+                                type: string
+                                description: 'Piece CID identifying this piece.'
+                              status:
+                                type: string
+                                description: 'Status of this replica. Can be "active", "slashed" or "expired".'
               examples:
                 default:
                   value:
