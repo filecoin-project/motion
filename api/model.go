@@ -14,8 +14,8 @@ type (
 		Error string `json:"error"`
 	}
 	GetStatusResponse struct {
-		ID      string   `json:"id"`
-		Replica *Replica `json:"Replicas,omitempty"`
+		ID       string    `json:"id"`
+		Replicas []Replica `json:"Replicas,omitempty"`
 	}
 	Replica struct {
 		Provider string  `json:"provider"`

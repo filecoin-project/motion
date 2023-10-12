@@ -30,7 +30,7 @@ type (
 		Size uint64
 		// ModificationTime is the latest time at which the blob was modified.
 		ModificationTime time.Time
-		Replica          *Replica
+		Replicas         []Replica
 	}
 	Replica struct {
 		Provider string
