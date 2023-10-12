@@ -64,9 +64,8 @@ func TestStorePut(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		// Putting test file more than size put queue. If this blocks, then
-		// store.toPack channel is not being read.
-		for i := 0; i < singularity.PutQueueSize+1; i++ {
+		// If this blocks, then store.toPack channel is not being read.
+		for i := 0; i < 17; i++ {
 			desc, err := s.Put(ctx, f)
 			require.NoError(t, err)
 			require.NotNil(t, desc)
