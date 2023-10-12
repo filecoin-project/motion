@@ -18,9 +18,13 @@ type (
 		Replicas []Replica `json:"Replicas,omitempty"`
 	}
 	Replica struct {
-		Provider     string    `json:"provider"`
-		Status       string    `json:"status"`
-		LastVerified time.Time `json:"lastVerified"`
+		Provider string  `json:"provider"`
+		Pieces   []Piece `json:"pieces"`
+	}
+	Piece struct {
 		Expiration   time.Time `json:"expiration"`
+		LastVerified time.Time `json:"lastVerified"`
+		PieceCID     string    `json:"pieceCid"`
+		Status       string    `json:"status"`
 	}
 )

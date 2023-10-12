@@ -152,14 +152,21 @@ func (m *HttpServer) handleBlobGetStatusByID(w http.ResponseWriter, r *http.Requ
 		ID: idUriSegment,
 	}
 
-	if blobDesc.Status != nil {
-		response.Replicas = make([]api.Replica, 0, len(blobDesc.Status.Replicas))
-		for _, replica := range blobDesc.Status.Replicas {
+	if len(blobDesc.Replicas) != 0 {
+		response.Replicas = make([]api.Replica, 0, len(blobDesc.Replicas))
+		for _, replica := range blobDesc.Replicas {
+			apiPieces := make([]api.Piece, 0, len(replica.Pieces))
+			for _, piece := range replica.Pieces {
+				apiPieces = append(apiPieces, api.Piece{
+					Expiration:   piece.Expiration,
+					LastVerified: piece.LastUpdated,
+					PieceCID:     piece.PieceCID,
+					Status:       piece.Status,
+				})
+			}
 			response.Replicas = append(response.Replicas, api.Replica{
-				Provider:     replica.Provider,
-				Status:       replica.Status,
-				LastVerified: replica.LastUpdated,
-				Expiration:   replica.Expiration,
+				Provider: replica.Provider,
+				Pieces:   apiPieces,
 			})
 		}
 	}

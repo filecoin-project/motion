@@ -107,26 +107,36 @@ paths:
                         provider:
                           type: string
                           description: 'ID of the Filecoin storage provider.'
-                        status:
-                          type: string
-                          description: 'Status of this replica. Can be "active", "slashed" or "expired".'
-                        lastVerified:
-                          type: string
-                          format: date-time
-                          description: 'Last verification time of the replica. Follows the RFC 3339 format.'
-                        expiration:
-                          type: string
-                          format: date-time
-                          description: 'Expiration time of the blob storage. Follows the RFC 3339 format.'
+                        pieces:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              expiration:
+                                type: string
+                                format: date-time
+                                description: 'Expiration time of the blob storage. Follows the RFC 3339 format.'
+                              lastVerified:
+                                type: string
+                                format: date-time
+                                description: 'Last verification time of the replica. Follows the RFC 3339 format.'
+                              pieceCid:
+                                type: string
+                                description: 'Piece CID identifying this piece.'
+                              status:
+                                type: string
+                                description: 'Status of this replica. Can be "active", "slashed" or "expired".'
               examples:
                 default:
                   value:
                     id: 'unique-blob-id'
-                    replicas:
-                      - provider: 'f0xxxx'
-                        status: 'active'
-                        lastVerified: '2023-05-29T00:00:00Z'
-                        expiration: '2023-06-29T00:00:00Z'
+                    replica:
+                        provider: 'f0xxxx'
+                        pieces: 
+                          - expiration: '2023-06-29T00:00:00Z'
+                            lastVerified: '2023-05-29T00:00:00Z'
+                            pieceCid: 'baguqexxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
+                            status: 'active'
         '404':
           description: 'No status found for the given ID.'
           content:
