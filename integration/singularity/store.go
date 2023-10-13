@@ -71,7 +71,7 @@ func (s *SingularityStore) initPreparation(ctx context.Context) (*models.ModelPr
 		Context: ctx,
 		Request: &models.DataprepCreateRequest{
 			MaxSize:        &s.maxCarSize,
-			Name:           s.preparationName,
+			Name:           &s.preparationName,
 			SourceStorages: []string{s.sourceName},
 		},
 	})
