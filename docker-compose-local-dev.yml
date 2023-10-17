@@ -1,3 +1,8 @@
+# To use it with a local Singularity instance, you need to make sure you have Singularity cloned in the same directory as motion
+# Use below command to run the docker compose
+# docker compose -f ./docker-compose-local-dev.yml up --build
+# -f specifies the docker compose configuration file
+# --build will force rebuilding Singularity or Motion if anything changes in the local code or Dockerfile
 version: '3.8'
 
 services:
@@ -10,77 +15,45 @@ services:
     extends:
       file: docker-compose.yml
       service: singularity_admin_init
-    depends_on:
-      db:
-        condition: service_healthy
+    build: ../singularity
+    image: singularity-local
 
   singularity_api:
     extends:
       file: docker-compose.yml
       service: singularity_api
-    depends_on:
-      singularity_admin_init:
-        condition: service_completed_successfully
+    image: singularity-local
 
   singularity_dataset_worker:
     extends:
       file: docker-compose.yml
       service: singularity_dataset_worker
-    depends_on:
-      singularity_admin_init:
-        condition: service_completed_successfully
+    image: singularity-local
 
   singularity_deal_pusher:
     extends:
       file: docker-compose.yml
       service: singularity_deal_pusher
-    depends_on:
-      singularity_admin_init:
-        condition: service_completed_successfully
+    image: singularity-local
 
   singularity_deal_tracker:
     extends:
       file: docker-compose.yml
       service: singularity_deal_tracker
-    depends_on:
-      singularity_admin_init:
-        condition: service_completed_successfully
+    image: singularity-local
 
   singularity_content_provider:
     extends:
       file: docker-compose.yml
       service: singularity_content_provider
-    depends_on:
-      singularity_admin_init:
-        condition: service_completed_successfully
+    image: singularity-local
 
   motion:
+    extends:
+      file: docker-compose.yml
+      service: motion
     build: .
-    entrypoint: motion --experimentalSingularityStore --experimentalRemoteSingularityAPIUrl=singularity_api:9090 --experimentalSingularityContentURLTemplate=${SINGULARITY_CONTENT_PROVIDER_DOMAIN:-http://singularity_content_provider:7778}/piece/{PIECE_CID}
-    ports:
-      - 40080:40080
-    environment:
-      - MOTION_STORE_DIR=/usr/src/app/storage
-      - LOTUS_TEST
-      - LOTUS_API
-      - LOTUS_TOKEN
-      - MOTION_STORAGE_PROVIDERS
-      - MOTION_PRICE_PER_GIB_EPOCH
-      - MOTION_PRICE_PER_GIB
-      - MOTION_PRICE_PER_DEAL
-      - MOTION_DEAL_START_DELAY
-      - MOTION_DEAL_DURATION
-      - MOTION_SINGULARITY_MAX_CAR_SIZE
-      - MOTION_SINGULARITY_PACK_THRESHOLD
-      - MOTION_SINGULARITY_SCHEDULE_CRON
-      - MOTION_SINGULARITY_SCHEDULE_DEAL_NUMBER
-      - MOTION_SINGULARITY_CLEANUP_INTERVAL
-      - MOTION_WALLET_KEY
-      - MOTION_VERIFIED_DEAL
-    volumes:
-      - motion-singularity-volume:/usr/src/app/storage
-    depends_on:
-      - singularity_api
+    image: motion-local
 
 volumes:
   motion-singularity-volume:

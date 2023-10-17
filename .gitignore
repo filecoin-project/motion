@@ -6,3 +6,4 @@ integration/test/motionlarity/.env.local
 integration/test/motionlarity/.up
 integration/test/devnet/.up
 integration/test/devnet/.boostready
+/docker-compose-local-dev.yml
