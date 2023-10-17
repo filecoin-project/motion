@@ -159,13 +159,17 @@ See the [Motion OpenAPI specification](openapi.yaml).
 
 ## Local Development
 
-To set up `filecoin-ffi` dependencies, run:
+To run all containers with locally built motion, run:
 
 ```shell
-make build
+docker compose -f ./docker-compose-local-dev.yml up --build
 ```
 
-This is only necessary to run once. After that you can use the regular `go build` command to build Motion from source.
+To run all containers with locally built motion as well as Singularity, run:
+
+```shell
+docker compose -f ./docker-compose-local-dev-with-singularity.yml up --build
+```
 
 ## License
 

@@ -24,7 +24,7 @@ jobs:
         env:
           cache-name: cache-fil-proof-params
         with:
-          path: ./integration/test/devnet/data/proofs
+          path: ~/.cache/filecoin-proof-parameters/
           key: ${{ runner.os }}-build-${{ env.cache-name }}
           restore-keys: |
             ${{ runner.os }}-build-${{ env.cache-name }}-
