@@ -1,7 +1,8 @@
+# To use it with a local Singularity instance, you need to make sure you have Singularity cloned in the same directory as motion
 # Use below command to run the docker compose
-# docker compose -f ./docker-compose-local-dev.yml up --build
+# docker compose -f ./docker-compose-local-dev-with-singularity.yml up --build
 # -f specifies the docker compose configuration file
-# --build will force rebuilding Motion if anything changes in the local code or Dockerfile
+# --build will force rebuilding Singularity or Motion if anything changes in the local code or Dockerfile
 version: '3.8'
 
 services:
@@ -14,31 +15,38 @@ services:
     extends:
       file: docker-compose.yml
       service: singularity_admin_init
+    build: ../singularity
+    image: singularity-local
 
   singularity_api:
     extends:
       file: docker-compose.yml
       service: singularity_api
+    image: singularity-local
 
   singularity_dataset_worker:
     extends:
       file: docker-compose.yml
       service: singularity_dataset_worker
+    image: singularity-local
 
   singularity_deal_pusher:
     extends:
       file: docker-compose.yml
       service: singularity_deal_pusher
+    image: singularity-local
 
   singularity_deal_tracker:
     extends:
       file: docker-compose.yml
       service: singularity_deal_tracker
+    image: singularity-local
 
   singularity_content_provider:
     extends:
       file: docker-compose.yml
       service: singularity_content_provider
+    image: singularity-local
 
   motion:
     extends:
