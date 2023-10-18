@@ -107,6 +107,7 @@ func (m *HttpServer) handleBlobGetByID(w http.ResponseWriter, r *http.Request, i
 		respondWithJson(w, errResponseBlobNotFound, http.StatusNotFound)
 		return
 	default:
+		logger.Warnf("m.store.Describe() failed")
 		respondWithJson(w, errResponseInternalError(err), http.StatusInternalServerError)
 		return
 	}
@@ -117,6 +118,7 @@ func (m *HttpServer) handleBlobGetByID(w http.ResponseWriter, r *http.Request, i
 		respondWithJson(w, errResponseBlobNotFound, http.StatusNotFound)
 		return
 	default:
+		logger.Warn("m.store.Get() failed")
 		respondWithJson(w, errResponseInternalError(err), http.StatusInternalServerError)
 		return
 	}
