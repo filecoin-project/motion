@@ -2,6 +2,7 @@ package test
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/filecoin-project/motion/api"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 )
@@ -41,6 +43,21 @@ func (s schemaCase) String() string {
 func TestApi(t *testing.T) {
 	env := NewEnvironment(t)
 
+	// Prereq: post 1 piece of data to test on
+	var testBlobResp api.PostBlobResponse
+	{
+		resp, err := http.Post(
+			requireJoinUrlPath(t, env.MotionAPIEndpoint, "v0", "blob"),
+			"application/octet-stream",
+			bytes.NewReader([]byte("a")),
+		)
+		require.NoError(t, err)
+
+		require.NoError(t, json.NewDecoder(resp.Body).Decode(&testBlobResp))
+
+		resp.Body.Close()
+	}
+
 	// ---- Add test cases here ----
 	tests := []testCase{
 		{
@@ -67,12 +84,10 @@ func TestApi(t *testing.T) {
 			skip:         true,
 		},
 		{
-			// tested in integration
 			name:         "GET /v0/blob/{id} is 200",
 			onMethod:     http.MethodGet,
-			onPath:       "/v0/blob/00000000-0000-0000-0000-000000000000",
+			onPath:       "/v0/blob/" + testBlobResp.ID,
 			expectStatus: 200,
-			skip:         true,
 		},
 		{
 			name:         "GET /v0/blob/{id} for unknown ID is 404",
@@ -95,15 +110,12 @@ func TestApi(t *testing.T) {
 			skip:         true,
 		},
 		{
-			// tested in integration
 			name:         "GET /v0/blob/{id}/status is 200",
 			onMethod:     http.MethodGet,
-			onPath:       "/v0/blob/00000000-0000-0000-0000-000000000000/status",
+			onPath:       "/v0/blob/" + testBlobResp.ID + "/status",
 			expectStatus: 200,
-			skip:         true,
 		},
 		{
-			// tested in integration
 			name:         "GET /v0/blob/{id}/status for unknown ID is 404",
 			onMethod:     http.MethodGet,
 			onPath:       "/v0/blob/00000000-0000-0000-0000-000000000000/status",
@@ -174,6 +186,8 @@ func TestApi(t *testing.T) {
 				body = string(bodyBytes)
 				require.Regexp(t, test.expectBody, string(body))
 			}
+
+			resp.Body.Close()
 
 			// Status code must be as expected
 			require.Equal(t, test.expectStatus, resp.StatusCode, "Incorrect status code for test %#v (resp body: %v)", test, body)
