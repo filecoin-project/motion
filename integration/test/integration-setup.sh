@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-echo "build config file and wallets for motion"
+echo "Building config file and wallets for motion..."
 # Setup Lotus API token
 export `docker compose -f ./devnet/docker-compose.yaml exec lotus lotus auth api-info --perm=admin`
 IFS=: read -r token path <<< "${FULLNODE_API_INFO}"
@@ -15,3 +15,4 @@ echo "MOTION_WALLET_KEY=${MOTION_WALLET_KEY}" >> $1
 echo "MOTION_STORAGE_PROVIDERS=t01000" >> $1
 echo "MOTION_API_ENDPOINT=http://localhost:40080" >> $1
 echo "SINGULARITY_API_ENDPOINT=http://localhost:9091" >> $1
+echo "Done building config file and wallets for motion"
