@@ -5,7 +5,7 @@
 ## Table of Contents
 
 - [Background](#background)
-- [Install](#install-and-setup)
+- [Install and setup](#install-and-setup)
 - [Usage](#usage)
 - [API Specification](#api-specification)
 - [Status](#status)
@@ -170,6 +170,36 @@ To run all containers with locally built motion as well as Singularity, run:
 ```shell
 docker compose -f ./docker-compose-local-dev-with-singularity.yml up --build
 ```
+
+### Full devnet for local testing
+
+The [./integration/test](./integration/test/) directory contains a full local devnet for running integration tests (see the [README](./integration/test/README.md) for more information) and can also be used to manually test the Motion API locally.
+
+The `motionlarity/up` make target in the integration test directory can be used to deploy a full Lotus, Boost, Singularity and Motion stack to execute against a devnet with Lotus sector size of 8MiB, Singularity CAR size of 7MiB and a Motion minimum deal threshold of 4MiB. The Motion API is exposed on port 40080 and the Singularity API is exposed on port 7778. The `motionlarity/up` build target builds using a Docker Compose file that will compile Motion from the local source directory. The `motionlarity/down` make target can be used to tear down the stack.
+
+With a Motion minimum deal threshold of 4Mib, the following command can be used (instead of the 20GB form above) to submit a blob large enough to trigger a deal:
+
+```shell
+head -c 5000000 /dev/urandom | curl -X POST --data-binary @- -H "Content-Type: application/octet-stream" http://localhost:40080/v0/blob
+```
+
+Use the `/status` `curl` command as above to check the Motion status of the blob. It should appear as `"proposed"` across replicas which means it's pending publishing in Boost.
+
+You can check the local Boost instance for the status of deals ready to publish:
+
+```shell
+echo '{"operationName":"AppDealPublishQuery","variables":{},"query":"query AppDealPublishQuery{dealPublish{Deals{ID __typename}__typename}}"}' \
+  | curl -X GET -d @- http://localhost:8080/graphql/query | jq .
+```
+
+Note that Boost does not automatically publish the deals on the devnet, so you will need to manually trigger deal publishing:
+
+```shell
+echo '{"operationName":"AppDealPublishNowMutation","variables":{},"query":"mutation AppDealPublishNowMutation{dealPublishNow}"}' \
+  | curl -X GET -d @- http://localhost:8080/graphql/query | jq .
+```
+
+Running the Motion `/status` `curl` command again should show that the deal replicas have been published and the status is now `"published"`.
 
 ## License
 
