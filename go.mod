@@ -12,6 +12,7 @@ require (
 	github.com/stretchr/testify v1.8.4
 	github.com/urfave/cli/v2 v2.25.7
 	go.uber.org/goleak v1.2.0
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -164,7 +165,6 @@ require (
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
 	google.golang.org/protobuf v1.30.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 	gorm.io/gorm v1.25.2-0.20230530020048-26663ab9bf55 // indirect
 	lukechampine.com/blake3 v1.2.1 // indirect
 )

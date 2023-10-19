@@ -105,7 +105,7 @@ Motion will begin saving data to Filecoin when it's holding at least 16GB of dat
 If you want to test storing an actual filecoin deal, the following simple script will put about 20GB of random data into motion:
 
 ```shell
-for i in {0..20}; do; head -c 1000000000 /dev/urandom | curl -X POST --data-binary @- -H "Content-Type: application/octet-stream" http://localhost:40080/v0/blob; done
+for i in {0..20}; do head -c 1000000000 /dev/urandom | curl -X POST --data-binary @- -H "Content-Type: application/octet-stream" http://localhost:40080/v0/blob; done
 ```
 
 This should be enough to trigger at least 1 Filecoin deal being made from Motion

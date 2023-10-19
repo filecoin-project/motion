@@ -76,13 +76,6 @@ func main() {
 				Name:     "lotus-test",
 				Category: "Lotus",
 				EnvVars:  []string{"LOTUS_TEST"},
-				Action: func(context *cli.Context, lotusTest bool) error {
-					if lotusTest {
-						logger.Info("Current network is set to Testnet")
-						address.CurrentNetwork = address.Testnet
-					}
-					return nil
-				},
 			},
 			&cli.UintFlag{
 				Name:        "replicationFactor",
@@ -165,6 +158,12 @@ func main() {
 			},
 		},
 		Action: func(cctx *cli.Context) error {
+			if cctx.Bool("lotus-test") {
+				logger.Info("Current network is set to Testnet")
+				address.CurrentNetwork = address.Testnet
+			} else {
+				address.CurrentNetwork = address.Mainnet
+			}
 			storeDir := cctx.String("storeDir")
 			var store blob.Store
 			if cctx.Bool("experimentalSingularityStore") {
