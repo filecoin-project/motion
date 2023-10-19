@@ -2,6 +2,7 @@ package singularity
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"math/big"
@@ -416,10 +417,12 @@ func (s *SingularityStore) Get(ctx context.Context, id blob.ID) (io.ReadSeekClos
 }
 
 func (s *SingularityStore) Describe(ctx context.Context, id blob.ID) (*blob.Descriptor, error) {
-	// this is largely artificial -- we're verifying the singularity item, but just reading from
-	// the local store
 	idStream, err := os.Open(path.Join(s.local.Dir(), id.String()+".id"))
 	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, blob.ErrBlobNotFound
+		}
+
 		return nil, err
 	}
 	fileIDString, err := io.ReadAll(idStream)
