@@ -1,3 +1,4 @@
 .github
 *.md
 integration/test
+docker-compose*.yml
