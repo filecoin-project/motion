@@ -468,7 +468,7 @@ func (s *SingularityStore) Describe(ctx context.Context, id blob.ID) (*blob.Desc
 
 	replicas := make([]blob.Replica, 0, len(getFileDealsRes.Payload))
 	for _, deal := range getFileDealsRes.Payload {
-		updatedAt, err := time.Parse("2006-01-02 15:04:05-07:00", deal.UpdatedAt)
+		updatedAt, err := time.Parse("2006-01-02 15:04:05-07:00", deal.LastVerifiedAt)
 		if err != nil {
 			updatedAt = time.Time{}
 		}
