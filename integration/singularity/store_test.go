@@ -87,6 +87,10 @@ func TestStorePut(t *testing.T) {
 func testHandler(w http.ResponseWriter, req *http.Request) {
 	defer req.Body.Close()
 
+	if req.URL.Path == "/api/identity" && req.Method == http.MethodPost {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
 	if req.URL.Path == "/api/preparation/MOTION_PREPARATION/schedules" && req.Method == http.MethodGet {
 		http.Error(w, "", http.StatusNotFound)
 		return

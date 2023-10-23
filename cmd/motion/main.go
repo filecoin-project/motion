@@ -16,6 +16,7 @@ import (
 	"github.com/filecoin-project/motion/blob"
 	"github.com/filecoin-project/motion/integration/singularity"
 	"github.com/ipfs/go-log/v2"
+	_ "github.com/joho/godotenv/autoload"
 	"github.com/urfave/cli/v2"
 )
 
@@ -45,11 +46,13 @@ func main() {
 				Name:        "experimentalSingularityStore",
 				Usage:       "Whether to use experimental Singularity store as the storage and deal making engine",
 				DefaultText: "Local storage is used",
+				EnvVars:     []string{"MOTION_EXPERIMENTAL_SINGULARITY_STORE"},
 			},
 			&cli.StringFlag{
 				Name:        "experimentalRemoteSingularityAPIUrl",
 				Usage:       "When using a singularity as the storage engine, if set, uses a remote HTTP API to interface with Singularity",
 				DefaultText: "use singularity as a code library",
+				EnvVars:     []string{"MOTION_EXPERIMENTAL_REMOTE_SINGULARITY_API_URL"},
 			},
 			&cli.StringSliceFlag{
 				Name:        "storageProvider",
@@ -135,6 +138,7 @@ func main() {
 				Name:        "experimentalSingularityContentURLTemplate",
 				Usage:       "When using a singularity as the storage engine, if set, setups up online deals to use the given url template for making online deals",
 				DefaultText: "make offline deals",
+				EnvVars:     []string{"MOTION_SINGULARITY_CONTENT_URL_TEMPLATE"},
 			},
 			&cli.StringFlag{
 				Name:        "experimentalSingularityScheduleCron",
