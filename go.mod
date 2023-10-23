@@ -3,12 +3,13 @@ module github.com/filecoin-project/motion
 go 1.20
 
 require (
-	github.com/data-preservation-programs/singularity v0.5.3
+	github.com/data-preservation-programs/singularity v0.5.4
 	github.com/filecoin-project/go-address v1.1.0
 	github.com/filecoin-project/go-state-types v0.12.0
 	github.com/google/uuid v1.3.1
 	github.com/gotidy/ptr v1.4.0
 	github.com/ipfs/go-log/v2 v2.5.1
+	github.com/joho/godotenv v1.5.1
 	github.com/stretchr/testify v1.8.4
 	github.com/urfave/cli/v2 v2.25.7
 	go.uber.org/goleak v1.2.0

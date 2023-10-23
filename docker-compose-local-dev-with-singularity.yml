@@ -35,6 +35,9 @@ services:
       file: docker-compose.yml
       service: singularity_deal_pusher
     image: singularity-local
+    network_mode: host
+    environment:
+      DATABASE_CONNECTION_STRING: postgres://${SINGULARITY_DB_USER:-postgres}:${SINGULARITY_DB_PASSWORD:-postgres}@127.0.0.1:5432/${SINGULARITY_DB_NAME:-singularity}
 
   singularity_deal_tracker:
     extends:
@@ -54,6 +57,16 @@ services:
       service: motion
     build: .
     image: motion-local
+
+  sim-sp:
+    image: sim-sp-local
+    build: ../sim-sp
+    command: run --http :7888
+    ports:
+      - 24001:24001
+    volumes:
+      - motion-singularity-volume:/usr/src/app/storage
+    network_mode: host
 
 volumes:
   motion-singularity-volume:

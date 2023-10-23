@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/data-preservation-programs/singularity/client/swagger/http/admin"
 	"github.com/data-preservation-programs/singularity/client/swagger/http/deal_schedule"
 	"github.com/data-preservation-programs/singularity/client/swagger/http/file"
 	"github.com/data-preservation-programs/singularity/client/swagger/http/job"
@@ -87,8 +88,23 @@ func (s *SingularityStore) initPreparation(ctx context.Context) (*models.ModelPr
 func (s *SingularityStore) Start(ctx context.Context) error {
 	logger := logger.With("preparation", s.preparationName)
 
-	// List out preparations and see if one with the configured name exists
+	// Set the identity to Motion for tracking purpose
+	resp, err := s.singularityClient.Admin.SetIdentity(&admin.SetIdentityParams{
+		Context: ctx,
+		Request: &models.AdminSetIdentityRequest{
+			Identity: "Motion",
+		},
+	})
+	if err != nil {
+		logger.Errorw("Failed to set motion identity, are you using Singularity v0.5.4+?", "err", err)
+		return fmt.Errorf("failed to set motion identity, are you using Singularity v0.5.4+?: %w", err)
+	}
+	if !resp.IsSuccess() {
+		logger.Errorw("Failed to set motion identity, are you using Singularity v0.5.4+?", "err", resp.Error())
+		return fmt.Errorf("failed to set motion identity, are you using Singularity v0.5.4+?: %s", resp.Error())
+	}
 
+	// List out preparations and see if one with the configured name exists
 	listPreparationsRes, err := s.singularityClient.Preparation.ListPreparations(&preparation.ListPreparationsParams{
 		Context: ctx,
 	})
@@ -380,7 +396,7 @@ func (s *SingularityStore) Put(ctx context.Context, reader io.ReadCloser) (*blob
 		logger.Errorw("Failed to move ID file to store", "err", err)
 		return nil, err
 	}
-	logger.Infow("Stored blob successfully", "id", desc.ID, "size", desc.Size, "singularityFileID", pushFileRes.Payload.ID)
+	logger.Infow("Stored blob successfully", "id", desc.ID.String(), "size", desc.Size, "singularityFileID", pushFileRes.Payload.ID)
 	return desc, nil
 }
 
