@@ -138,7 +138,7 @@ curl http://localhost:40080/v0/blob/ad7ef987-a932-495c-aa0c-7ffcabeda45f/status 
 ```json
 {
   "id": "ad7ef987-a932-495c-aa0c-7ffcabeda45f",
-  "Replicas": [
+  "replicas": [
     {
       "provider": "f1234",
       "status": "active",
