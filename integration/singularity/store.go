@@ -298,7 +298,7 @@ func (s *SingularityStore) runPreparationJobs() {
 			return
 
 		// If a new file came in, prepare it for packing, and mark the source
-		// ready to pack if the threshold is reached
+		// ready to pack if the threshold is reached. Also reset the timer.
 		case fileID := <-s.toPack:
 			prepareToPackFileRes, err := s.singularityClient.File.PrepareToPackFile(&file.PrepareToPackFileParams{
 				Context: ctx,
@@ -312,6 +312,7 @@ func (s *SingularityStore) runPreparationJobs() {
 					logger.Errorw("preparing to pack source", "error", err)
 				}
 			}
+			s.resetForcePackTimer()
 
 		// If forced pack message comes through (e.g. from pack threshold max
 		// wait time being exceeded), prepare to pack source immediately
