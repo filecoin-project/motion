@@ -54,7 +54,7 @@ func NewStore(o ...Option) (*SingularityStore, error) {
 		sourceName: "source",
 		toPack:     make(chan uint64, 1),
 		closing:    make(chan struct{}),
-		forcePack:  time.NewTicker(opts.packThresholdMaxWait),
+		forcePack:  time.NewTicker(opts.forcePackAfter),
 	}, nil
 }
 
@@ -316,7 +316,7 @@ func (s *SingularityStore) runPreparationJobs() {
 		// If forced pack message comes through (e.g. from pack threshold max
 		// wait time being exceeded), prepare to pack source immediately
 		case <-s.forcePack.C:
-			logger.Infof("Pack threshold not met after max wait time of %s, forcing pack of any pending data", s.packThresholdMaxWait)
+			logger.Infof("Pack threshold not met after max wait time of %s, forcing pack of any pending data", s.forcePackAfter)
 			if err := s.prepareToPackSource(ctx); err != nil {
 				logger.Errorw("preparing to pack source (forced)", "error", err)
 			}
@@ -333,9 +333,13 @@ func (s *SingularityStore) prepareToPackSource(ctx context.Context) error {
 		Name:    s.sourceName,
 	})
 
-	s.forcePack.Reset(s.packThresholdMaxWait)
+	s.resetForcePackTimer()
 
 	return err
+}
+
+func (s *SingularityStore) resetForcePackTimer() {
+	s.forcePack.Reset(s.forcePackAfter)
 }
 
 func (s *SingularityStore) Shutdown(ctx context.Context) error {
