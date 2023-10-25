@@ -20,7 +20,7 @@ services:
 
   singularity_admin_init:
     image: ghcr.io/data-preservation-programs/singularity${SINGULARITY_REF}
-    command: admin init
+    command: admin init --identity Motion
     volumes:
       - motion-singularity-volume:/usr/src/app/storage
     environment:
