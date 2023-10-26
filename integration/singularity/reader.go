@@ -3,6 +3,7 @@ package singularity
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 
@@ -24,9 +25,6 @@ func (r *SingularityReader) Read(p []byte) (int, error) {
 		return 0, io.EOF
 	}
 
-	buf := bytes.NewBuffer(p)
-	buf.Reset()
-
 	// Figure out how many bytes to read
 	readLen := int64(len(p))
 	remainingBytes := r.size - r.offset
@@ -34,37 +32,57 @@ func (r *SingularityReader) Read(p []byte) (int, error) {
 		readLen = remainingBytes
 	}
 
+	buf := bytes.NewBuffer(p)
+	buf.Reset()
+
+	n, err := r.writeToN(buf, readLen)
+	return int(n), err
+}
+
+// WriteTo is implemented in order to directly handle io.Copy operations
+// rather than allow small, separate Read operations.
+func (r *SingularityReader) WriteTo(w io.Writer) (int64, error) {
+	if r.offset >= r.size {
+		return 0, io.EOF
+	}
+	// Read all remaining bytes and write them to w.
+	return r.writeToN(w, r.size-r.offset)
+}
+
+func (r *SingularityReader) writeToN(w io.Writer, readLen int64) (int64, error) {
 	_, _, err := r.client.File.RetrieveFile(&file.RetrieveFileParams{
 		Context: context.Background(),
 		ID:      int64(r.fileID),
 		Range:   ptr.String(fmt.Sprintf("bytes=%d-%d", r.offset, r.offset+readLen-1)),
-	}, buf)
+	}, w)
 	if err != nil {
 		return 0, fmt.Errorf("failed to retrieve file slice: %w", err)
 	}
 
 	r.offset += readLen
 
-	return int(readLen), nil
+	return readLen, nil
 }
 
 func (r *SingularityReader) Seek(offset int64, whence int) (int64, error) {
-	var newOffset int64
-
 	switch whence {
 	case io.SeekStart:
-		newOffset = offset
 	case io.SeekCurrent:
-		newOffset = r.offset + offset
+		offset += r.offset
 	case io.SeekEnd:
-		newOffset = r.size + offset
+		offset += r.size
+	default:
+		return 0, errors.New("unknown seek mode")
 	}
 
-	if newOffset > r.size {
-		return 0, fmt.Errorf("byte offset would exceed file size")
+	if offset > r.size {
+		return 0, errors.New("seek past end of file")
+	}
+	if offset < 0 {
+		return 0, errors.New("seek before start of file")
 	}
 
-	r.offset = newOffset
+	r.offset = offset
 
 	return r.offset, nil
 }
