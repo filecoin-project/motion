@@ -26,6 +26,7 @@ type (
 		dealDuration          abi.ChainEpoch
 		maxCarSize            string
 		packThreshold         int64
+		forcePackAfter        time.Duration
 		preparationName       string
 		singularityClient     *singularityclient.SingularityAPI
 		scheduleUrlTemplate   string
@@ -50,6 +51,7 @@ func newOptions(o ...Option) (*options, error) {
 		dealStartDelay:        builtin.EpochsInHour * 72,
 		maxCarSize:            "31.5GiB",
 		packThreshold:         16 << 30,
+		forcePackAfter:        time.Hour * 24,
 		preparationName:       "MOTION_PREPARATION",
 		scheduleCronPerpetual: true,
 		verifiedDeal:          false,
@@ -181,6 +183,15 @@ func WithMaxCarSize(s string) Option {
 func WithPackThreshold(s int64) Option {
 	return func(o *options) error {
 		o.packThreshold = s
+		return nil
+	}
+}
+
+// WithForcePackAfter sets the maximum amount of time to wait without any data being received before forcing packing.
+// Defaults to 24 hours.
+func WithForcePackAfter(d time.Duration) Option {
+	return func(o *options) error {
+		o.forcePackAfter = d
 		return nil
 	}
 }

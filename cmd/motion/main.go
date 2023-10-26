@@ -127,6 +127,13 @@ func main() {
 				Value:       16 << 30,
 				EnvVars:     []string{"MOTION_SINGULARITY_PACK_THRESHOLD"},
 			},
+			&cli.DurationFlag{
+				Name:        "singularityForcePackAfter",
+				Usage:       "The maximum amount of time to wait without any data being received before forcing packing",
+				DefaultText: "24 hours",
+				Value:       24 * time.Hour,
+				EnvVars:     []string{"MOTION_SINGULARITY_FORCE_PACK_AFTER"},
+			},
 			&cli.BoolFlag{
 				Name:        "verifiedDeal",
 				Usage:       "whether deals made with motion should be verified deals",
@@ -206,6 +213,7 @@ func main() {
 					singularity.WithWalletKey(cctx.String("walletKey")),
 					singularity.WithMaxCarSize(cctx.String("singularityMaxCarSize")),
 					singularity.WithPackThreshold(cctx.Int64("singularityPackThreshold")),
+					singularity.WithForcePackAfter(cctx.Duration("singularityForcePackAfter")),
 					singularity.WithScheduleUrlTemplate(cctx.String("experimentalSingularityContentURLTemplate")),
 					singularity.WithScheduleCron(cctx.String("experimentalSingularityScheduleCron")),
 					singularity.WithScheduleDealNumber(cctx.Int("experimentalSingularityScheduleDealNumber")),

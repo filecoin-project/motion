@@ -39,6 +39,7 @@ type SingularityStore struct {
 	toPack     chan uint64
 	closing    chan struct{}
 	closed     sync.WaitGroup
+	forcePack  *time.Ticker
 }
 
 func NewStore(o ...Option) (*SingularityStore, error) {
@@ -47,12 +48,14 @@ func NewStore(o ...Option) (*SingularityStore, error) {
 		logger.Errorw("Failed to instantiate options", "err", err)
 		return nil, err
 	}
+
 	return &SingularityStore{
 		options:    opts,
 		local:      blob.NewLocalStore(opts.storeDir),
 		sourceName: "source",
 		toPack:     make(chan uint64, 1),
 		closing:    make(chan struct{}),
+		forcePack:  time.NewTicker(opts.forcePackAfter),
 	}, nil
 }
 
@@ -306,29 +309,54 @@ func (s *SingularityStore) runPreparationJobs() {
 
 	for {
 		select {
+		// If context is cancelled, end
 		case <-s.closing:
 			return
+
+		// If a new file came in, prepare it for packing, and mark the source
+		// ready to pack if the threshold is reached. Also reset the timer.
 		case fileID := <-s.toPack:
-			prepareToPackSourceRes, err := s.singularityClient.File.PrepareToPackFile(&file.PrepareToPackFileParams{
+			prepareToPackFileRes, err := s.singularityClient.File.PrepareToPackFile(&file.PrepareToPackFileParams{
 				Context: ctx,
 				ID:      int64(fileID),
 			})
 			if err != nil {
 				logger.Errorw("preparing to pack file", "fileID", fileID, "error", err)
 			}
-			if prepareToPackSourceRes.Payload > s.packThreshold {
-				// mark outstanding pack jobs as ready to go so we can make CAR files
-				_, err := s.singularityClient.Job.PrepareToPackSource(&job.PrepareToPackSourceParams{
-					Context: ctx,
-					ID:      s.preparationName,
-					Name:    s.sourceName,
-				})
-				if err != nil {
+			if prepareToPackFileRes.Payload > s.packThreshold {
+				if err := s.prepareToPackSource(ctx); err != nil {
 					logger.Errorw("preparing to pack source", "error", err)
 				}
 			}
+			s.resetForcePackTimer()
+
+		// If forced pack message comes through (e.g. from pack threshold max
+		// wait time being exceeded), prepare to pack source immediately
+		case <-s.forcePack.C:
+			logger.Infof("Pack threshold not met after max wait time of %s, forcing pack of any pending data", s.forcePackAfter)
+			if err := s.prepareToPackSource(ctx); err != nil {
+				logger.Errorw("preparing to pack source (forced)", "error", err)
+			}
 		}
 	}
+}
+
+// Marks outstanding pack jobs as ready to go so CAR files can be made, and
+// updates the last pack time
+func (s *SingularityStore) prepareToPackSource(ctx context.Context) error {
+	_, err := s.singularityClient.Job.PrepareToPackSource(&job.PrepareToPackSourceParams{
+		Context: ctx,
+		ID:      s.preparationName,
+		Name:    s.sourceName,
+	})
+
+	s.resetForcePackTimer()
+
+	return err
+}
+
+func (s *SingularityStore) resetForcePackTimer() {
+	s.forcePack.Reset(s.forcePackAfter)
 }
 
 func (s *SingularityStore) Shutdown(ctx context.Context) error {
@@ -344,6 +372,8 @@ func (s *SingularityStore) Shutdown(ctx context.Context) error {
 	case <-ctx.Done():
 	case <-done:
 	}
+
+	s.forcePack.Stop()
 
 	logger.Infof("Singularity store shut down")
 
