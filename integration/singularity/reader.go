@@ -18,6 +18,9 @@ type SingularityReader struct {
 	fileID uint64
 	offset int64
 	size   int64
+
+	// Reads remaining data from current range.
+	rangeReader *rangeReader
 }
 
 func (r *SingularityReader) Read(p []byte) (int, error) {
@@ -50,18 +53,83 @@ func (r *SingularityReader) WriteTo(w io.Writer) (int64, error) {
 }
 
 func (r *SingularityReader) writeToN(w io.Writer, readLen int64) (int64, error) {
-	_, _, err := r.client.File.RetrieveFile(&file.RetrieveFileParams{
-		Context: context.Background(),
-		ID:      int64(r.fileID),
-		Range:   ptr.String(fmt.Sprintf("bytes=%d-%d", r.offset, r.offset+readLen-1)),
-	}, w)
-	if err != nil {
-		return 0, fmt.Errorf("failed to retrieve file slice: %w", err)
+	var read int64
+	// If there is a rangeReader from the previous read that can be used to
+	// continue reading more data, then use it instead of doing another
+	// findFileRanges and Retrieve for more reads from this same range.
+	if r.rangeReader != nil {
+		// If continuing from the previous read, keep reading from this rangeReader.
+		if r.offset == r.rangeReader.offset {
+			// Reading data leftover from previous read into w.
+			n, err := r.rangeReader.writeToN(w, readLen)
+			if err != nil && !errors.Is(err, io.EOF) {
+				return 0, err
+			}
+			r.offset += n
+			readLen -= n
+			read += n
+			if r.rangeReader.remaining == 0 {
+				// No data left in range reader.
+				r.rangeReader.close()
+				r.rangeReader = nil
+			}
+			if readLen == 0 {
+				// Read all requested data from leftover in rangeReader.
+				return read, nil
+			}
+			// No more leftover data to read, but readLen additional bytes
+			// still needed. Will read more data from next range(s).
+		} else {
+			// Trying to read from outside of rangeReader's range. Must have
+			// seeked out of current range. Close rangeReader and read new
+			// range.
+			r.rangeReader.close()
+			r.rangeReader = nil
+		}
 	}
 
-	r.offset += readLen
+	rangeReadLen := readLen
+	offsetInRange := r.offset - r.size
+	remainingRange := r.size - offsetInRange
+	if rangeReadLen > remainingRange {
+		rangeReadLen = remainingRange
+	}
 
-	return readLen, nil
+	byteRange := fmt.Sprintf("bytes=%d-%d", r.offset, r.offset+readLen-1)
+	rr := &rangeReader{
+		offset:    r.offset,
+		reader:    r.retrieveReader(context.Background(), int64(r.fileID), byteRange),
+		remaining: remainingRange,
+	}
+
+	// Reading readLen of the remaining bytes in this range.
+	n, err := rr.writeToN(w, readLen)
+	if err != nil && !errors.Is(err, io.EOF) {
+		rr.close()
+		return 0, err
+	}
+	r.offset += n
+	readLen -= n
+	read += n
+
+	// check for missing file ranges at the end
+	if readLen > 0 {
+		if rr != nil {
+			rr.close()
+		}
+		return read, fmt.Errorf("not enough data to serve entire range %s", byteRange)
+	}
+
+	// Some unread data left over in this range. Save it for next read.
+	if rr.remaining != 0 {
+		// Saving leftover rangeReader with rr.remaining bytes left.
+		r.rangeReader = rr
+	} else {
+		// Leftover rangeReader has 0 bytes remaining.
+		rr.close()
+	}
+
+	return read, nil
 }
 
 func (r *SingularityReader) Seek(offset int64, whence int) (int64, error) {
@@ -88,5 +156,29 @@ func (r *SingularityReader) Seek(offset int64, whence int) (int64, error) {
 }
 
 func (r *SingularityReader) Close() error {
-	return nil
+	var err error
+	if r.rangeReader != nil {
+		err = r.rangeReader.close()
+		r.rangeReader = nil
+	}
+	return err
+}
+
+func (r *SingularityReader) retrieveReader(ctx context.Context, fileID int64, byteRange string) io.ReadCloser {
+	// Start goroutine to read from singularity into write end of pipe.
+	reader, writer := io.Pipe()
+	go func() {
+		_, _, err := r.client.File.RetrieveFile(&file.RetrieveFileParams{
+			Context: ctx,
+			ID:      fileID,
+			Range:   ptr.String(byteRange),
+		}, writer)
+		if err != nil {
+			err = fmt.Errorf("failed to retrieve file slice: %w", err)
+		}
+		writer.CloseWithError(err)
+	}()
+
+	// Return the read end of pipe.
+	return reader
 }
