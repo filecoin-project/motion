@@ -114,9 +114,7 @@ func (r *SingularityReader) writeToN(w io.Writer, readLen int64) (int64, error) 
 
 	// check for missing file ranges at the end
 	if readLen > 0 {
-		if rr != nil {
-			rr.close()
-		}
+		rr.close()
 		return read, fmt.Errorf("not enough data to serve entire range %s", byteRange)
 	}
 
