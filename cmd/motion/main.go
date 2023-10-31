@@ -61,20 +61,6 @@ func main() {
 				DefaultText: "No deals are made to replicate data onto storage providers.",
 				EnvVars:     []string{"MOTION_STORAGE_PROVIDERS"},
 			},
-			&cli.StringFlag{
-				Name:     "lotusApi",
-				Category: "Lotus",
-				Usage:    "Lotus RPC API endpoint",
-				Value:    "https://api.node.glif.io/rpc/v1",
-				EnvVars:  []string{"LOTUS_API"},
-			},
-			&cli.StringFlag{
-				Name:     "lotusToken",
-				Category: "Lotus",
-				Usage:    "Lotus RPC API token",
-				Value:    "",
-				EnvVars:  []string{"LOTUS_TOKEN"},
-			},
 			&cli.BoolFlag{
 				Name:     "lotus-test",
 				Category: "Lotus",
