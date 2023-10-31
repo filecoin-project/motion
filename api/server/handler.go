@@ -125,7 +125,7 @@ func (m *HttpServer) handleBlobGetByID(w http.ResponseWriter, r *http.Request, i
 	w.Header().Set(httpHeaderContentTypeOptionsNoSniff())
 	w.Header().Set(httpHeaderContentLength(blobDesc.Size))
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachement; filename="%s.bin"`, id.String()))
-	http.ServeContent(w, r, "", blobDesc.ModificationTime, blobReader)
+	serveContent(w, r, "", blobDesc.ModificationTime, blobReader)
 	logger.Debug("Blob fetched successfully")
 }
 

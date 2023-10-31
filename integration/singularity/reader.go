@@ -38,7 +38,7 @@ func (r *SingularityReader) Read(p []byte) (int, error) {
 	buf := bytes.NewBuffer(p)
 	buf.Reset()
 
-	n, err := r.writeToN(buf, readLen)
+	n, err := r.WriteToN(buf, readLen)
 	return int(n), err
 }
 
@@ -49,10 +49,10 @@ func (r *SingularityReader) WriteTo(w io.Writer) (int64, error) {
 		return 0, io.EOF
 	}
 	// Read all remaining bytes and write them to w.
-	return r.writeToN(w, r.size-r.offset)
+	return r.WriteToN(w, r.size-r.offset)
 }
 
-func (r *SingularityReader) writeToN(w io.Writer, readLen int64) (int64, error) {
+func (r *SingularityReader) WriteToN(w io.Writer, readLen int64) (int64, error) {
 	var read int64
 	// If there is a rangeReader from the previous read that can be used to
 	// continue reading more data, then use it instead of doing another
@@ -68,24 +68,16 @@ func (r *SingularityReader) writeToN(w io.Writer, readLen int64) (int64, error) 
 			r.offset += n
 			readLen -= n
 			read += n
-			if r.rangeReader.remaining == 0 {
-				// No data left in range reader.
-				r.rangeReader.close()
-				r.rangeReader = nil
-			}
 			if readLen == 0 {
 				// Read all requested data from leftover in rangeReader.
 				return read, nil
 			}
 			// No more leftover data to read, but readLen additional bytes
 			// still needed. Will read more data from next range(s).
-		} else {
-			// Trying to read from outside of rangeReader's range. Must have
-			// seeked out of current range. Close rangeReader and read new
-			// range.
-			r.rangeReader.close()
-			r.rangeReader = nil
 		}
+		// No more leftover data in rangeReader, or seek to done since last read.
+		r.rangeReader.close()
+		r.rangeReader = nil
 	}
 
 	rangeReadLen := readLen
