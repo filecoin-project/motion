@@ -1,6 +1,6 @@
 services:
   cloudserver:
-    image: ghcr.io/filecoin-project/motion-cloudserver:${MOTION_COULDSERVER_VERSION}
+    image: ghcr.io/filecoin-project/motion-cloudserver:${MOTION_CLOUDSERVER_VERSION}
     environment:
       REMOTE_MANAGEMENT_DISABLE: 1
       S3DATA: 'multiple'
