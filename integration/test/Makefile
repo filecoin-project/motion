@@ -26,7 +26,7 @@ devnet/up: ./devnet/.up
 
 motionlarity/setup: ./motionlarity/.env.local ./devnet/.boostready
 
-devnet/down: motionlarity/down
+devnet/down:
 	docker compose -f ./devnet/docker-compose.yaml down
 	sleep 2
 	rm -f ./devnet/.up || true
@@ -41,7 +41,7 @@ devnet/down: motionlarity/down
 
 motionlarity/up: ./motionlarity/.up
 
-motionlarity/down:
+motionlarity/down: devnet/down
 	docker compose -f ./motionlarity/docker-compose.yaml down --rmi=all --volumes
 	rm -f ./motionlarity/.up || true
 	rm -f ./motionlarity/.env.local || true
