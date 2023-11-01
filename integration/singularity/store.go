@@ -45,8 +45,7 @@ type SingularityStore struct {
 func NewStore(o ...Option) (*SingularityStore, error) {
 	opts, err := newOptions(o...)
 	if err != nil {
-		logger.Errorw("Failed to instantiate options", "err", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to init options: %w", err)
 	}
 
 	return &SingularityStore{
@@ -67,6 +66,9 @@ func (s *SingularityStore) initPreparation(ctx context.Context) (*models.ModelPr
 			Path: s.local.Dir(),
 		},
 	})
+	if err == nil && !createSourceStorageRes.IsSuccess() {
+		err = errors.New(createSourceStorageRes.Error())
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to create source storage: %w", err)
 	}
@@ -92,19 +94,14 @@ func (s *SingularityStore) Start(ctx context.Context) error {
 	logger := logger.With("preparation", s.preparationName)
 
 	// Set the identity to Motion for tracking purpose
-	resp, err := s.singularityClient.Admin.SetIdentity(&admin.SetIdentityParams{
+	_, err := s.singularityClient.Admin.SetIdentity(&admin.SetIdentityParams{
 		Context: ctx,
 		Request: &models.AdminSetIdentityRequest{
 			Identity: "Motion",
 		},
 	})
 	if err != nil {
-		logger.Errorw("Failed to set motion identity, are you using Singularity v0.5.4+?", "err", err)
-		return fmt.Errorf("failed to set motion identity, are you using Singularity v0.5.4+?: %w", err)
-	}
-	if !resp.IsSuccess() {
-		logger.Errorw("Failed to set motion identity, are you using Singularity v0.5.4+?", "err", resp.Error())
-		return fmt.Errorf("failed to set motion identity, are you using Singularity v0.5.4+?: %s", resp.Error())
+		return fmt.Errorf("failed to set motion identity: %w (are you using Singularity v0.5.4+?)", err)
 	}
 
 	// List out preparations and see if one with the configured name exists
@@ -112,7 +109,6 @@ func (s *SingularityStore) Start(ctx context.Context) error {
 		Context: ctx,
 	})
 	if err != nil {
-		logger.Errorw("Failed to list preparations", "err", err)
 		return fmt.Errorf("failed to list preparations: %w", err)
 	}
 
@@ -127,7 +123,6 @@ func (s *SingularityStore) Start(ctx context.Context) error {
 		// If no preparation was found, initialize it
 		_, err = s.initPreparation(ctx)
 		if err != nil {
-			logger.Errorw("First-time preparation initialization failed", "err", err)
 			return fmt.Errorf("first-time preparation initialization failed: %w", err)
 		}
 	}
@@ -137,7 +132,6 @@ func (s *SingularityStore) Start(ctx context.Context) error {
 		Context: ctx,
 	})
 	if err != nil {
-		logger.Errorw("Failed to list singularity wallets", "err", err)
 		return fmt.Errorf("failed to list singularity wallets: %w", err)
 	}
 	var wlt *models.ModelWallet
@@ -157,8 +151,7 @@ func (s *SingularityStore) Start(ctx context.Context) error {
 			},
 		})
 		if err != nil {
-			logger.Errorw("Failed to import wallet to singularity", "err", err)
-			return fmt.Errorf("failed to import wallet: %w", err)
+			return fmt.Errorf("failed to import wallet to singularity: %w", err)
 		}
 
 		wlt = importWalletRes.Payload
@@ -170,7 +163,7 @@ func (s *SingularityStore) Start(ctx context.Context) error {
 		ID:      s.preparationName,
 	})
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to list attached wallets: %w", err)
 	}
 	walletFound := false
 	for _, existing := range listAttachedWalletsRes.Payload {
@@ -187,8 +180,7 @@ func (s *SingularityStore) Start(ctx context.Context) error {
 			ID:      s.preparationName,
 			Wallet:  wlt.Address,
 		}); err != nil {
-			logger.Errorw("Failed to add wallet to preparation", "err", err)
-			return err
+			return fmt.Errorf("failed to add wallet to preparation: %w", err)
 		} else {
 			logger.Infow("Successfully added wallet to preparation", "id", attachWalletRes.Payload.ID)
 		}
@@ -206,8 +198,7 @@ func (s *SingularityStore) Start(ctx context.Context) error {
 	case strings.Contains(err.Error(), "404"):
 		logger.Info("Found no schedules for preparation")
 	default:
-		logger.Errorw("Failed to list schedules for preparation", "err", err)
-		return err
+		return fmt.Errorf("failed to list schedules for preparation: %w", err)
 	}
 
 	pricePerGBEpoch, _ := (new(big.Rat).SetFrac(s.pricePerGiBEpoch.Int, big.NewInt(int64(1e18)))).Float64()
@@ -253,8 +244,7 @@ func (s *SingularityStore) Start(ctx context.Context) error {
 				},
 			})
 			if err != nil {
-				logger.Errorw("Failed to update schedule for provider", "err", err)
-				return fmt.Errorf("failed to update schedule: %w", err)
+				return fmt.Errorf("failed to update schedule for provider: %w", err)
 			}
 		} else {
 			// Otherwise, create it
@@ -283,8 +273,7 @@ func (s *SingularityStore) Start(ctx context.Context) error {
 					URLTemplate:           s.scheduleUrlTemplate,
 				},
 			}); err != nil {
-				logger.Errorw("Failed to create schedule for provider", "err", err)
-				return fmt.Errorf("failed to create schedule: %w", err)
+				return fmt.Errorf("failed to create schedule for provider: %w", err)
 			} else {
 				logger.Infow("Successfully created schedule for provider", "id", createScheduleRes.Payload.ID)
 			}
@@ -321,11 +310,13 @@ func (s *SingularityStore) runPreparationJobs() {
 				ID:      int64(fileID),
 			})
 			if err != nil {
-				logger.Errorw("preparing to pack file", "fileID", fileID, "error", err)
+				logger.Errorw("Failed to prepare to pack file", "fileID", fileID, "error", err)
+				continue
 			}
 			if prepareToPackFileRes.Payload > s.packThreshold {
 				if err := s.prepareToPackSource(ctx); err != nil {
-					logger.Errorw("preparing to pack source", "error", err)
+					logger.Errorw("Failed to prepare to pack source", "error", err)
+					continue
 				}
 			}
 			s.resetForcePackTimer()
@@ -335,7 +326,8 @@ func (s *SingularityStore) runPreparationJobs() {
 		case <-s.forcePack.C:
 			logger.Infof("Pack threshold not met after max wait time of %s, forcing pack of any pending data", s.forcePackAfter)
 			if err := s.prepareToPackSource(ctx); err != nil {
-				logger.Errorw("preparing to pack source (forced)", "error", err)
+				logger.Errorw("Failed to prepare to pack source (forced)", "error", err)
+				continue
 			}
 		}
 	}
@@ -383,7 +375,6 @@ func (s *SingularityStore) Shutdown(ctx context.Context) error {
 func (s *SingularityStore) Put(ctx context.Context, reader io.ReadCloser) (*blob.Descriptor, error) {
 	desc, err := s.local.Put(ctx, reader)
 	if err != nil {
-		logger.Errorw("Failed to store file locally", "err", err)
 		return nil, fmt.Errorf("failed to put file locally: %w", err)
 	}
 	filePath := desc.ID.String() + ".bin"
@@ -394,20 +385,16 @@ func (s *SingularityStore) Put(ctx context.Context, reader io.ReadCloser) (*blob
 		Name:    s.sourceName,
 	})
 	if err != nil {
-		logger.Errorw("Failed to push file to singularity", "path", filePath, "err", err)
-		return nil, fmt.Errorf("error creating singularity entry: %w", err)
+		return nil, fmt.Errorf("error creating singularity entry at %s: %w", filePath, err)
 	}
 	select {
 	case <-ctx.Done():
-		err := ctx.Err()
-		logger.Errorw("Context done while putting file", "err", err)
-		return nil, err
+		return nil, ctx.Err()
 	case s.toPack <- uint64(pushFileRes.Payload.ID):
 	}
 	idFile, err := os.CreateTemp(s.local.Dir(), "motion_local_store_*.bin.temp")
 	if err != nil {
-		logger.Errorw("Failed to create temporary file", "err", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to create temporary file: %w", err)
 	}
 	defer func() {
 		if err := idFile.Close(); err != nil {
@@ -419,14 +406,14 @@ func (s *SingularityStore) Put(ctx context.Context, reader io.ReadCloser) (*blob
 		if err := os.Remove(idFile.Name()); err != nil {
 			logger.Debugw("Failed to remove temporary file", "path", idFile.Name(), "err", err)
 		}
-		logger.Errorw("Failed to write ID file", "err", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to write ID file: %w", err)
 	}
 	if err = os.Rename(idFile.Name(), path.Join(s.local.Dir(), desc.ID.String()+".id")); err != nil {
-		logger.Errorw("Failed to move ID file to store", "err", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to move ID file to store: %w", err)
 	}
+
 	logger.Infow("Stored blob successfully", "id", desc.ID.String(), "size", desc.Size, "singularityFileID", pushFileRes.Payload.ID)
+
 	return desc, nil
 }
 
@@ -484,6 +471,7 @@ func (s *SingularityStore) Describe(ctx context.Context, id blob.ID) (*blob.Desc
 		ID:      int64(fileID),
 	})
 	if err != nil {
+		// TODO(@elijaharita): this is not very robust, but is there even a better way?
 		if strings.Contains(err.Error(), "404") {
 			return nil, blob.ErrBlobNotFound
 		}

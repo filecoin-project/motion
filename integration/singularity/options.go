@@ -2,6 +2,7 @@ package singularity
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"time"
 
@@ -68,7 +69,7 @@ func newOptions(o ...Option) (*options, error) {
 	}
 	for _, apply := range o {
 		if err := apply(opts); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to apply option: %w", err)
 		}
 	}
 	if opts.walletKey == "" {
