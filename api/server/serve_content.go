@@ -431,22 +431,6 @@ func checkPreconditions(w http.ResponseWriter, r *http.Request, modtime time.Tim
 	return false, rangeHeader
 }
 
-// toHTTPError returns a non-specific HTTP error message and status code
-// for a given non-nil error value. It's important that toHTTPError does not
-// actually return err.Error(), since msg and httpStatus are returned to users,
-// and historically Go's ServeContent always returned just "404 Not Found" for
-// all errors. We don't want to start leaking information in error messages.
-func toHTTPError(err error) (msg string, httpStatus int) {
-	if errors.Is(err, fs.ErrNotExist) {
-		return "404 page not found", http.StatusNotFound
-	}
-	if errors.Is(err, fs.ErrPermission) {
-		return "403 Forbidden", http.StatusForbidden
-	}
-	// Default:
-	return "500 Internal Server Error", http.StatusInternalServerError
-}
-
 // httpRange specifies the byte range to be sent to the client.
 type httpRange struct {
 	start, length int64
