@@ -8,6 +8,7 @@ import (
 	"math/big"
 	"os"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -418,7 +419,7 @@ func (s *SingularityStore) Put(ctx context.Context, reader io.ReadCloser) (*blob
 }
 
 func (s *SingularityStore) Get(ctx context.Context, id blob.ID) (io.ReadSeekCloser, error) {
-	idStream, err := os.Open(path.Join(s.local.Dir(), id.String()+".id"))
+	idStream, err := os.Open(filepath.Join(s.local.Dir(), id.String()+".id"))
 	if err != nil {
 		return nil, err
 	}
@@ -442,15 +443,11 @@ func (s *SingularityStore) Get(ctx context.Context, id blob.ID) (io.ReadSeekClos
 		return nil, fmt.Errorf("error loading singularity entry: %w", err)
 	}
 
-	return &SingularityReader{
-		client: s.singularityClient,
-		fileID: fileID,
-		size:   getFileRes.Payload.Size,
-	}, nil
+	return NewReader(s.singularityClient, fileID, getFileRes.Payload.Size), nil
 }
 
 func (s *SingularityStore) Describe(ctx context.Context, id blob.ID) (*blob.Descriptor, error) {
-	idStream, err := os.Open(path.Join(s.local.Dir(), id.String()+".id"))
+	idStream, err := os.Open(filepath.Join(s.local.Dir(), id.String()+".id"))
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return nil, blob.ErrBlobNotFound
@@ -566,7 +563,7 @@ binIteration:
 		}
 
 		idFileName := id + ".id"
-		idStream, err := os.Open(path.Join(s.local.Dir(), idFileName))
+		idStream, err := os.Open(filepath.Join(s.local.Dir(), idFileName))
 		if err != nil {
 			logger.Warnf("Failed to open ID map file for %s: %v", id, err)
 			continue
@@ -615,7 +612,7 @@ binIteration:
 	}
 
 	for _, binFileName := range binsToDelete {
-		if err := os.Remove(path.Join(s.local.Dir(), binFileName)); err != nil {
+		if err := os.Remove(filepath.Join(s.local.Dir(), binFileName)); err != nil {
 			logger.Warnf("Failed to delete local bin file %s that was staged for removal: %v", binFileName, err)
 		}
 	}
