@@ -75,7 +75,7 @@ func (r *SingularityReader) WriteToN(w io.Writer, readLen int64) (int64, error) 
 			// No more leftover data to read, but readLen additional bytes
 			// still needed. Will read more data from next range(s).
 		}
-		// No more leftover data in rangeReader, or seek to done since last read.
+		// No more leftover data in rangeReader, or seek since last read.
 		r.rangeReader.close()
 		r.rangeReader = nil
 	}
