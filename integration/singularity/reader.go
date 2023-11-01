@@ -23,6 +23,14 @@ type SingularityReader struct {
 	rangeReader *rangeReader
 }
 
+func NewReader(client *singularityclient.SingularityAPI, fileID uint64, size int64) *SingularityReader {
+	return &SingularityReader{
+		client: client,
+		fileID: fileID,
+		size:   size,
+	}
+}
+
 func (r *SingularityReader) Read(p []byte) (int, error) {
 	if r.offset >= r.size {
 		return 0, io.EOF
@@ -45,14 +53,15 @@ func (r *SingularityReader) Read(p []byte) (int, error) {
 // WriteTo is implemented in order to directly handle io.Copy operations
 // rather than allow small, separate Read operations.
 func (r *SingularityReader) WriteTo(w io.Writer) (int64, error) {
-	if r.offset >= r.size {
-		return 0, io.EOF
-	}
 	// Read all remaining bytes and write them to w.
 	return r.WriteToN(w, r.size-r.offset)
 }
 
 func (r *SingularityReader) WriteToN(w io.Writer, readLen int64) (int64, error) {
+	if r.offset >= r.size {
+		return 0, io.EOF
+	}
+
 	var read int64
 	// If there is a rangeReader from the previous read that can be used to
 	// continue reading more data, then use it instead of doing another
