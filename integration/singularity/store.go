@@ -420,19 +420,13 @@ func (s *SingularityStore) Put(ctx context.Context, reader io.ReadCloser) (*blob
 }
 
 func (s *SingularityStore) PassGet(w http.ResponseWriter, r *http.Request, id blob.ID) {
-	idStream, err := os.Open(filepath.Join(s.local.Dir(), id.String()+".id"))
+	fileIDString, err := os.ReadFile(filepath.Join(s.local.Dir(), id.String()+".id"))
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			logger.Warnw("Cannot find requested id file", "id", id.String())
 			http.Error(w, "", http.StatusNotFound)
 			return
 		}
-		logger.Errorw("Cannot open id file", "err", err, "id", id.String())
-		http.Error(w, "", http.StatusInternalServerError)
-		return
-	}
-	fileIDString, err := io.ReadAll(idStream)
-	if err != nil {
 		logger.Errorw("Cannot read id file", "err", err, "id", id.String())
 		http.Error(w, "", http.StatusInternalServerError)
 		return
@@ -444,13 +438,16 @@ func (s *SingularityStore) PassGet(w http.ResponseWriter, r *http.Request, id bl
 		return
 	}
 
-	rangeHeader := r.Header.Get("Range")
-
-	_, _, err = s.singularityClient.File.RetrieveFile(&file.RetrieveFileParams{
+	params := &file.RetrieveFileParams{
 		Context: r.Context(),
 		ID:      int64(fileID),
-		Range:   ptr.String(rangeHeader),
-	}, w)
+	}
+	rangeHeader := r.Header.Get("Range")
+	if rangeHeader != "" {
+		params.Range = ptr.String(rangeHeader)
+	}
+
+	_, _, err = s.singularityClient.File.RetrieveFile(params, w)
 	if err != nil {
 		logger.Errorw("Failed to retrieve file slice", "err", err, "id", id.String(), "fileID", fileID)
 		if strings.Contains(err.Error(), "404") {
@@ -464,11 +461,7 @@ func (s *SingularityStore) PassGet(w http.ResponseWriter, r *http.Request, id bl
 }
 
 func (s *SingularityStore) Get(ctx context.Context, id blob.ID) (io.ReadSeekCloser, error) {
-	idStream, err := os.Open(filepath.Join(s.local.Dir(), id.String()+".id"))
-	if err != nil {
-		return nil, err
-	}
-	fileIDString, err := io.ReadAll(idStream)
+	fileIDString, err := os.ReadFile(filepath.Join(s.local.Dir(), id.String()+".id"))
 	if err != nil {
 		return nil, err
 	}
@@ -492,16 +485,11 @@ func (s *SingularityStore) Get(ctx context.Context, id blob.ID) (io.ReadSeekClos
 }
 
 func (s *SingularityStore) Describe(ctx context.Context, id blob.ID) (*blob.Descriptor, error) {
-	idStream, err := os.Open(filepath.Join(s.local.Dir(), id.String()+".id"))
+	fileIDString, err := os.ReadFile(filepath.Join(s.local.Dir(), id.String()+".id"))
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return nil, blob.ErrBlobNotFound
 		}
-
-		return nil, err
-	}
-	fileIDString, err := io.ReadAll(idStream)
-	if err != nil {
 		return nil, err
 	}
 	fileID, err := strconv.ParseUint(string(fileIDString), 10, 64)
@@ -517,7 +505,6 @@ func (s *SingularityStore) Describe(ctx context.Context, id blob.ID) (*blob.Desc
 		if strings.Contains(err.Error(), "404") {
 			return nil, blob.ErrBlobNotFound
 		}
-
 		return nil, fmt.Errorf("error loading singularity entry: %w", err)
 	}
 	var decoded blob.ID
@@ -608,14 +595,9 @@ binIteration:
 		}
 
 		idFileName := id + ".id"
-		idStream, err := os.Open(filepath.Join(s.local.Dir(), idFileName))
+		fileIDString, err := os.ReadFile(filepath.Join(s.local.Dir(), idFileName))
 		if err != nil {
 			logger.Warnf("Failed to open ID map file for %s: %v", id, err)
-			continue
-		}
-		fileIDString, err := io.ReadAll(idStream)
-		if err != nil {
-			logger.Warnf("Failed to read ID map file for %s: %v", id, err)
 			continue
 		}
 		fileID, err := strconv.ParseUint(string(fileIDString), 10, 64)
