@@ -5,7 +5,7 @@ import (
 	"errors"
 	"io"
 	"os"
-	"path"
+	"path/filepath"
 )
 
 var _ Store = (*LocalStore)(nil)
@@ -51,7 +51,7 @@ func (l *LocalStore) Put(_ context.Context, reader io.ReadCloser) (*Descriptor, 
 		os.Remove(dest.Name())
 		return nil, err
 	}
-	if err = os.Rename(dest.Name(), path.Join(l.dir, id.String()+".bin")); err != nil {
+	if err = os.Rename(dest.Name(), filepath.Join(l.dir, id.String()+".bin")); err != nil {
 		return nil, err
 	}
 	stat, err := dest.Stat()
@@ -68,29 +68,29 @@ func (l *LocalStore) Put(_ context.Context, reader io.ReadCloser) (*Descriptor, 
 // Get Retrieves the content of blob.
 // If no blob is found for the given id, ErrBlobNotFound is returned.
 func (l *LocalStore) Get(_ context.Context, id ID) (io.ReadSeekCloser, error) {
-	switch blob, err := os.Open(path.Join(l.dir, id.String()+".bin")); {
-	case err == nil:
-		return blob, nil
-	case errors.Is(err, os.ErrNotExist):
-		return nil, ErrBlobNotFound
-	default:
+	blob, err := os.Open(filepath.Join(l.dir, id.String()+".bin"))
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, ErrBlobNotFound
+		}
 		return nil, err
 	}
+	return blob, nil
 }
 
 // Describe gets the description of the blob for the given id.
 // If no blob is found for the given id, ErrBlobNotFound is returned.
 func (l *LocalStore) Describe(ctx context.Context, id ID) (*Descriptor, error) {
-	switch stat, err := os.Stat(path.Join(l.dir, id.String()+".bin")); {
-	case err == nil:
-		return &Descriptor{
-			ID:               id,
-			Size:             uint64(stat.Size()),
-			ModificationTime: stat.ModTime(),
-		}, nil
-	case errors.Is(err, os.ErrNotExist):
-		return nil, ErrBlobNotFound
-	default:
+	stat, err := os.Stat(filepath.Join(l.dir, id.String()+".bin"))
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, ErrBlobNotFound
+		}
 		return nil, err
 	}
+	return &Descriptor{
+		ID:               id,
+		Size:             uint64(stat.Size()),
+		ModificationTime: stat.ModTime(),
+	}, nil
 }
