@@ -110,6 +110,10 @@ func (m *HttpServer) handleBlobGetByID(w http.ResponseWriter, r *http.Request, i
 		respondWithJson(w, errResponseInternalError(err), http.StatusInternalServerError)
 		return
 	}
+	if pass, ok := m.store.(blob.PassThroughGet); ok {
+		pass.PassGet(w, r, id)
+		return
+	}
 	blobReader, err := m.store.Get(r.Context(), id)
 	switch err {
 	case nil:
@@ -125,7 +129,7 @@ func (m *HttpServer) handleBlobGetByID(w http.ResponseWriter, r *http.Request, i
 	w.Header().Set(httpHeaderContentTypeOptionsNoSniff())
 	w.Header().Set(httpHeaderContentLength(blobDesc.Size))
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachement; filename="%s.bin"`, id.String()))
-	serveContent(w, r, "", blobDesc.ModificationTime, blobReader)
+	http.ServeContent(w, r, "", blobDesc.ModificationTime, blobReader)
 	logger.Debug("Blob fetched successfully")
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"net/http"
 	"time"
 
 	"github.com/google/uuid"
@@ -46,6 +47,9 @@ type (
 		Put(context.Context, io.ReadCloser) (*Descriptor, error)
 		Describe(context.Context, ID) (*Descriptor, error)
 		Get(context.Context, ID) (io.ReadSeekCloser, error)
+	}
+	PassThroughGet interface {
+		PassGet(http.ResponseWriter, *http.Request, ID)
 	}
 )
 

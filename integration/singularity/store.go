@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"math/big"
+	"net/http"
 	"os"
 	"path"
 	"path/filepath"
@@ -416,6 +417,50 @@ func (s *SingularityStore) Put(ctx context.Context, reader io.ReadCloser) (*blob
 	logger.Infow("Stored blob successfully", "id", desc.ID.String(), "size", desc.Size, "singularityFileID", pushFileRes.Payload.ID)
 
 	return desc, nil
+}
+
+func (s *SingularityStore) PassGet(w http.ResponseWriter, r *http.Request, id blob.ID) {
+	idStream, err := os.Open(filepath.Join(s.local.Dir(), id.String()+".id"))
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			logger.Warnw("Cannot find requested id file", "id", id.String())
+			http.Error(w, "", http.StatusNotFound)
+			return
+		}
+		logger.Errorw("Cannot open id file", "err", err, "id", id.String())
+		http.Error(w, "", http.StatusInternalServerError)
+		return
+	}
+	fileIDString, err := io.ReadAll(idStream)
+	if err != nil {
+		logger.Errorw("Cannot read id file", "err", err, "id", id.String())
+		http.Error(w, "", http.StatusInternalServerError)
+		return
+	}
+	fileID, err := strconv.ParseUint(string(fileIDString), 10, 64)
+	if err != nil {
+		logger.Errorw("Cannot parse id file", "err", err, "id", id.String())
+		http.Error(w, "", http.StatusInternalServerError)
+		return
+	}
+
+	rangeHeader := r.Header.Get("Range")
+
+	_, _, err = s.singularityClient.File.RetrieveFile(&file.RetrieveFileParams{
+		Context: r.Context(),
+		ID:      int64(fileID),
+		Range:   ptr.String(rangeHeader),
+	}, w)
+	if err != nil {
+		logger.Errorw("Failed to retrieve file slice", "err", err, "id", id.String(), "fileID", fileID)
+		if strings.Contains(err.Error(), "404") {
+			http.Error(w, "", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "", http.StatusInternalServerError)
+		return
+	}
+	logger.Info("Retrieved file", "id", id.String())
 }
 
 func (s *SingularityStore) Get(ctx context.Context, id blob.ID) (io.ReadSeekCloser, error) {
