@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"time"
 
 	singularityclient "github.com/data-preservation-programs/singularity/client/swagger/http"
@@ -182,6 +183,10 @@ func main() {
 				// Instantiate Singularity client depending on specified flags.
 				var singClient *singularityclient.SingularityAPI
 				if singularityAPIUrl != "" {
+					// Ensure URL includes scheme.
+					if !strings.HasPrefix(singularityAPIUrl, "http://") && !strings.HasPrefix(singularityAPIUrl, "https://") {
+						singularityAPIUrl = "http://" + singularityAPIUrl
+					}
 					singClient = singularityclient.NewHTTPClientWithConfig(
 						nil,
 						singularityclient.DefaultTransportConfig().WithHost(singularityAPIUrl),
