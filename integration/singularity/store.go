@@ -34,7 +34,7 @@ import (
 
 var logger = log.Logger("motion/integration/singularity")
 
-type SingularityStore struct {
+type Store struct {
 	*options
 	local      *blob.LocalStore
 	sourceName string
@@ -44,13 +44,13 @@ type SingularityStore struct {
 	forcePack  *time.Ticker
 }
 
-func NewStore(o ...Option) (*SingularityStore, error) {
+func NewStore(o ...Option) (*Store, error) {
 	opts, err := newOptions(o...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init options: %w", err)
 	}
 
-	return &SingularityStore{
+	return &Store{
 		options:    opts,
 		local:      blob.NewLocalStore(opts.storeDir),
 		sourceName: "source",
@@ -60,7 +60,7 @@ func NewStore(o ...Option) (*SingularityStore, error) {
 	}, nil
 }
 
-func (s *SingularityStore) initPreparation(ctx context.Context) (*models.ModelPreparation, error) {
+func (s *Store) initPreparation(ctx context.Context) (*models.ModelPreparation, error) {
 	createSourceStorageRes, err := s.singularityClient.Storage.CreateLocalStorage(&storage.CreateLocalStorageParams{
 		Context: ctx,
 		Request: &models.StorageCreateLocalStorageRequest{
@@ -92,7 +92,7 @@ func (s *SingularityStore) initPreparation(ctx context.Context) (*models.ModelPr
 	return createPreparationRes.Payload, nil
 }
 
-func (s *SingularityStore) Start(ctx context.Context) error {
+func (s *Store) Start(ctx context.Context) error {
 	logger := logger.With("preparation", s.preparationName)
 
 	// Set the identity to Motion for tracking purpose
@@ -291,7 +291,7 @@ func (s *SingularityStore) Start(ctx context.Context) error {
 	return nil
 }
 
-func (s *SingularityStore) runPreparationJobs() {
+func (s *Store) runPreparationJobs() {
 	defer s.closed.Done()
 
 	// Create a context that gets canceled when this function exits.
@@ -337,7 +337,7 @@ func (s *SingularityStore) runPreparationJobs() {
 
 // Marks outstanding pack jobs as ready to go so CAR files can be made, and
 // updates the last pack time
-func (s *SingularityStore) prepareToPackSource(ctx context.Context) error {
+func (s *Store) prepareToPackSource(ctx context.Context) error {
 	_, err := s.singularityClient.Job.PrepareToPackSource(&job.PrepareToPackSourceParams{
 		Context: ctx,
 		ID:      s.preparationName,
@@ -349,11 +349,11 @@ func (s *SingularityStore) prepareToPackSource(ctx context.Context) error {
 	return err
 }
 
-func (s *SingularityStore) resetForcePackTimer() {
+func (s *Store) resetForcePackTimer() {
 	s.forcePack.Reset(s.forcePackAfter)
 }
 
-func (s *SingularityStore) Shutdown(ctx context.Context) error {
+func (s *Store) Shutdown(ctx context.Context) error {
 	close(s.closing)
 
 	done := make(chan struct{})
@@ -374,7 +374,7 @@ func (s *SingularityStore) Shutdown(ctx context.Context) error {
 	return nil
 }
 
-func (s *SingularityStore) Put(ctx context.Context, reader io.ReadCloser) (*blob.Descriptor, error) {
+func (s *Store) Put(ctx context.Context, reader io.ReadCloser) (*blob.Descriptor, error) {
 	desc, err := s.local.Put(ctx, reader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to put file locally: %w", err)
@@ -419,7 +419,7 @@ func (s *SingularityStore) Put(ctx context.Context, reader io.ReadCloser) (*blob
 	return desc, nil
 }
 
-func (s *SingularityStore) PassGet(w http.ResponseWriter, r *http.Request, id blob.ID) {
+func (s *Store) PassGet(w http.ResponseWriter, r *http.Request, id blob.ID) {
 	fileIDString, err := os.ReadFile(filepath.Join(s.local.Dir(), id.String()+".id"))
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -460,7 +460,7 @@ func (s *SingularityStore) PassGet(w http.ResponseWriter, r *http.Request, id bl
 	logger.Infow("Retrieved file", "id", id.String())
 }
 
-func (s *SingularityStore) Get(ctx context.Context, id blob.ID) (io.ReadSeekCloser, error) {
+func (s *Store) Get(ctx context.Context, id blob.ID) (io.ReadSeekCloser, error) {
 	fileIDString, err := os.ReadFile(filepath.Join(s.local.Dir(), id.String()+".id"))
 	if err != nil {
 		return nil, err
@@ -484,7 +484,7 @@ func (s *SingularityStore) Get(ctx context.Context, id blob.ID) (io.ReadSeekClos
 	return NewReader(s.singularityClient, fileID, getFileRes.Payload.Size), nil
 }
 
-func (s *SingularityStore) Describe(ctx context.Context, id blob.ID) (*blob.Descriptor, error) {
+func (s *Store) Describe(ctx context.Context, id blob.ID) (*blob.Descriptor, error) {
 	fileIDString, err := os.ReadFile(filepath.Join(s.local.Dir(), id.String()+".id"))
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -550,7 +550,7 @@ func (s *SingularityStore) Describe(ctx context.Context, id blob.ID) (*blob.Desc
 	return descriptor, nil
 }
 
-func (s *SingularityStore) runCleanupWorker() {
+func (s *Store) runCleanupWorker() {
 	defer s.closed.Done()
 
 	// Run immediately once before starting ticker
@@ -569,13 +569,13 @@ func (s *SingularityStore) runCleanupWorker() {
 	}
 }
 
-func (s *SingularityStore) runCleanupJob() {
+func (s *Store) runCleanupJob() {
 	if err := s.cleanup(context.Background()); err != nil {
 		logger.Errorf("Local store cleanup failed: %w", err)
 	}
 }
 
-func (s *SingularityStore) cleanup(ctx context.Context) error {
+func (s *Store) cleanup(ctx context.Context) error {
 	logger.Info("Starting local store cleanup")
 
 	dir, err := os.ReadDir(s.local.Dir())
@@ -629,7 +629,7 @@ func (s *SingularityStore) cleanup(ctx context.Context) error {
 
 // hasDealForAllProviders returns true if the file has at least 1 deal for
 // every SP.
-func (s *SingularityStore) hasDealForAllProviders(ctx context.Context, fileID int64) bool {
+func (s *Store) hasDealForAllProviders(ctx context.Context, fileID int64) bool {
 	getFileDealsRes, err := s.singularityClient.File.GetFileDeals(&file.GetFileDealsParams{
 		Context: ctx,
 		ID:      fileID,

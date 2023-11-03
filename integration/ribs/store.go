@@ -24,28 +24,28 @@ import (
 )
 
 // TODO parameterize this.
-const ribsStoreChunkSize = 1 << 20 // 1 MiB
+const storeChunkSize = 1 << 20 // 1 MiB
 
 var (
-	_ blob.Store        = (*RibsStore)(nil)
-	_ io.ReadSeekCloser = (*ribsStoredBlobReader)(nil)
+	_ blob.Store        = (*Store)(nil)
+	_ io.ReadSeekCloser = (*storedBlobReader)(nil)
 )
 
 type (
-	// RibsStore is an experimental Store implementation that uses RIBS.
+	// Store is an experimental Store implementation that uses RIBS.
 	// See: https://github.com/filcat/ribs
-	RibsStore struct {
+	Store struct {
 		ribs     ribs.RIBS
 		maxSize  int
 		indexDir string
 	}
-	ribsStoredBlob struct {
+	storedBlob struct {
 		*blob.Descriptor
 		Chunks []cid.Cid `json:"chunks"`
 	}
-	ribsStoredBlobReader struct {
+	storedBlobReader struct {
 		sess   ribs.Session
-		blob   *ribsStoredBlob
+		blob   *storedBlob
 		offset int64
 
 		currentChunkIndex       int
@@ -54,8 +54,8 @@ type (
 	}
 )
 
-// NewRibsStore instantiates a new experimental RIBS store.
-func NewRibsStore(dir string, ks types.KeyStore) (*RibsStore, error) {
+// NewStore instantiates a new experimental RIBS store.
+func NewStore(dir string, ks types.KeyStore) (*Store, error) {
 	dir = filepath.Clean(dir)
 	rbdealDir := filepath.Join(dir, "rbdeal")
 	if err := os.Mkdir(rbdealDir, 0750); err != nil && !errors.Is(err, os.ErrExist) {
@@ -74,7 +74,7 @@ func NewRibsStore(dir string, ks types.KeyStore) (*RibsStore, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &RibsStore{
+	return &Store{
 		ribs:     rbs,
 		maxSize:  31 << 30, // 31 GiB
 		indexDir: indexDir,
@@ -82,11 +82,11 @@ func NewRibsStore(dir string, ks types.KeyStore) (*RibsStore, error) {
 
 }
 
-func (r *RibsStore) Start(_ context.Context) error {
+func (s *Store) Start(_ context.Context) error {
 	// TODO: change RIBS to take context.
-	return r.ribs.Start()
+	return s.ribs.Start()
 }
-func (r *RibsStore) Put(ctx context.Context, in io.ReadCloser) (*blob.Descriptor, error) {
+func (s *Store) Put(ctx context.Context, in io.ReadCloser) (*blob.Descriptor, error) {
 
 	// Generate ID early to fail early if generation fails.
 	id, err := uuid.NewRandom()
@@ -99,9 +99,9 @@ func (r *RibsStore) Put(ctx context.Context, in io.ReadCloser) (*blob.Descriptor
 	//      also see: https://github.com/anjor/anelace
 	// TODO we could do things here to make commp etc. more efficient.
 	//      for now this implementation remains highly experimental and optimised for velocity.
-	batch := r.ribs.Session(ctx).Batch(ctx)
+	batch := s.ribs.Session(ctx).Batch(ctx)
 
-	splitter := chunk.NewSizeSplitter(in, ribsStoreChunkSize)
+	splitter := chunk.NewSizeSplitter(in, storeChunkSize)
 
 	// TODO: Store the byte ranges for satisfying io.ReadSeaker in case chunk size is not constant across blocks?
 	var chunkCids []cid.Cid
@@ -114,7 +114,7 @@ SplitLoop:
 			break SplitLoop
 		case nil:
 			size += len(b)
-			if size > r.maxSize {
+			if size > s.maxSize {
 				return nil, blob.ErrBlobTooLarge
 			}
 			mh, err := multihash.Sum(b, multihash.SHA2_256, -1)
@@ -136,7 +136,7 @@ SplitLoop:
 	if err := batch.Flush(ctx); err != nil {
 		return nil, err
 	}
-	storedBlob := &ribsStoredBlob{
+	storedBlob := &storedBlob{
 		Descriptor: &blob.Descriptor{
 			ID:               blob.ID(id),
 			Size:             uint64(size),
@@ -144,7 +144,7 @@ SplitLoop:
 		},
 		Chunks: chunkCids,
 	}
-	index, err := os.Create(filepath.Join(r.indexDir, id.String()))
+	index, err := os.Create(filepath.Join(s.indexDir, id.String()))
 	if err != nil {
 		return nil, err
 	}
@@ -155,29 +155,29 @@ SplitLoop:
 	return storedBlob.Descriptor, nil
 }
 
-func (r *RibsStore) Get(ctx context.Context, id blob.ID) (io.ReadSeekCloser, error) {
-	storedBlob, err := r.describeRibsStoredBlob(ctx, id)
+func (s *Store) Get(ctx context.Context, id blob.ID) (io.ReadSeekCloser, error) {
+	storedBlob, err := s.describeStoredBlob(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	session := r.ribs.Session(ctx)
-	reader, err := newRibsStoredBlobReader(session, storedBlob)
+	session := s.ribs.Session(ctx)
+	reader, err := newStoredBlobReader(session, storedBlob)
 	if err != nil {
 		return nil, err
 	}
 	return reader, nil
 }
 
-func (r *RibsStore) Describe(ctx context.Context, id blob.ID) (*blob.Descriptor, error) {
-	storedBlob, err := r.describeRibsStoredBlob(ctx, id)
+func (s *Store) Describe(ctx context.Context, id blob.ID) (*blob.Descriptor, error) {
+	storedBlob, err := s.describeStoredBlob(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 	return storedBlob.Descriptor, err
 }
 
-func (r *RibsStore) describeRibsStoredBlob(_ context.Context, id blob.ID) (*ribsStoredBlob, error) {
-	index, err := os.Open(filepath.Join(r.indexDir, id.String()))
+func (s *Store) describeStoredBlob(_ context.Context, id blob.ID) (*storedBlob, error) {
+	index, err := os.Open(filepath.Join(s.indexDir, id.String()))
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return nil, blob.ErrBlobNotFound
@@ -186,21 +186,21 @@ func (r *RibsStore) describeRibsStoredBlob(_ context.Context, id blob.ID) (*ribs
 	}
 	defer index.Close()
 
-	var storedBlob ribsStoredBlob
+	var storedBlob storedBlob
 	err = json.NewDecoder(index).Decode(&storedBlob)
 	// TODO: populate descriptor status with Filecoin chain data about the stored blob.
 	return &storedBlob, err
 }
 
-func (r *RibsStore) Shutdown(_ context.Context) error {
+func (s *Store) Shutdown(_ context.Context) error {
 	// TODO: change RIBS to take context.
-	return r.ribs.Close()
+	return s.ribs.Close()
 }
 
-func (rsb *ribsStoredBlob) chunkIndexAtOffset(o int64) (int, bool) {
+func (rsb *storedBlob) chunkIndexAtOffset(o int64) (int, bool) {
 	var i int
-	if o >= ribsStoreChunkSize {
-		i = int(o / ribsStoreChunkSize)
+	if o >= storeChunkSize {
+		i = int(o / storeChunkSize)
 	}
 	if i >= len(rsb.Chunks) {
 		return -1, false
@@ -208,14 +208,14 @@ func (rsb *ribsStoredBlob) chunkIndexAtOffset(o int64) (int, bool) {
 	return i, true
 }
 
-func newRibsStoredBlobReader(sess ribs.Session, rsb *ribsStoredBlob) (*ribsStoredBlobReader, error) {
-	return &ribsStoredBlobReader{
+func newStoredBlobReader(sess ribs.Session, rsb *storedBlob) (*storedBlobReader, error) {
+	return &storedBlobReader{
 		sess: sess,
 		blob: rsb,
 	}, nil
 }
 
-func (r *ribsStoredBlobReader) Read(p []byte) (n int, err error) {
+func (r *storedBlobReader) Read(p []byte) (n int, err error) {
 	if r.currentChunkReader == nil {
 		if err := r.sess.View(context.TODO(),
 			[]multihash.Multihash{r.blob.Chunks[r.currentChunkIndex].Hash()},
@@ -245,7 +245,7 @@ func (r *ribsStoredBlobReader) Read(p []byte) (n int, err error) {
 	return read, err
 }
 
-func (r *ribsStoredBlobReader) Seek(offset int64, whence int) (int64, error) {
+func (r *storedBlobReader) Seek(offset int64, whence int) (int64, error) {
 	var newOffset int64
 	switch whence {
 	case io.SeekStart:
@@ -272,10 +272,10 @@ func (r *ribsStoredBlobReader) Seek(offset int64, whence int) (int64, error) {
 	}
 	r.offset = newOffset
 	r.currentChunkIndex = chunkIndex
-	r.currentChunkPendingSeek = newOffset % ribsStoreChunkSize
+	r.currentChunkPendingSeek = newOffset % storeChunkSize
 	return r.offset, nil
 }
 
-func (r *ribsStoredBlobReader) Close() error {
+func (r *storedBlobReader) Close() error {
 	return nil
 }
