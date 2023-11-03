@@ -115,6 +115,10 @@ func (m *HttpServer) handleBlobGetByID(w http.ResponseWriter, r *http.Request, i
 		respondWithJson(w, errResponseInternalError(err), http.StatusInternalServerError)
 		return
 	}
+	if pass, ok := m.store.(blob.PassThroughGet); ok {
+		pass.PassGet(w, r, id)
+		return
+	}
 	blobReader, err := m.store.Get(r.Context(), id)
 	switch err {
 	case nil:
