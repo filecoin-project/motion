@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path"
+	"path/filepath"
 	"time"
 
 	"github.com/filecoin-project/lotus/chain/types"
@@ -56,12 +56,12 @@ type (
 
 // NewRibsStore instantiates a new experimental RIBS store.
 func NewRibsStore(dir string, ks types.KeyStore) (*RibsStore, error) {
-	dir = path.Clean(dir)
-	rbdealDir := path.Join(dir, "rbdeal")
+	dir = filepath.Clean(dir)
+	rbdealDir := filepath.Join(dir, "rbdeal")
 	if err := os.Mkdir(rbdealDir, 0750); err != nil && !errors.Is(err, os.ErrExist) {
 		return nil, fmt.Errorf("failed to create RIBS deal directory: %w", err)
 	}
-	indexDir := path.Join(dir, "index")
+	indexDir := filepath.Join(dir, "index")
 	if err := os.Mkdir(indexDir, 0750); err != nil && !errors.Is(err, os.ErrExist) {
 		return nil, fmt.Errorf("failed to create RIBS internal directory: %w", err)
 	}
@@ -144,11 +144,12 @@ SplitLoop:
 		},
 		Chunks: chunkCids,
 	}
-	index, err := os.Create(path.Join(r.indexDir, id.String()))
+	index, err := os.Create(filepath.Join(r.indexDir, id.String()))
 	if err != nil {
 		return nil, err
 	}
-	if err := json.NewEncoder(index).Encode(storedBlob); err != nil {
+	defer index.Close()
+	if err = json.NewEncoder(index).Encode(storedBlob); err != nil {
 		return nil, err
 	}
 	return storedBlob.Descriptor, nil
@@ -176,17 +177,19 @@ func (r *RibsStore) Describe(ctx context.Context, id blob.ID) (*blob.Descriptor,
 }
 
 func (r *RibsStore) describeRibsStoredBlob(_ context.Context, id blob.ID) (*ribsStoredBlob, error) {
-	switch index, err := os.Open(path.Join(r.indexDir, id.String())); {
-	case err == nil:
-		var storedBlob ribsStoredBlob
-		err := json.NewDecoder(index).Decode(&storedBlob)
-		// TODO: populate descriptor status with Filecoin chain data about the stored blob.
-		return &storedBlob, err
-	case errors.Is(err, os.ErrNotExist):
-		return nil, blob.ErrBlobNotFound
-	default:
+	index, err := os.Open(filepath.Join(r.indexDir, id.String()))
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, blob.ErrBlobNotFound
+		}
 		return nil, err
 	}
+	defer index.Close()
+
+	var storedBlob ribsStoredBlob
+	err = json.NewDecoder(index).Decode(&storedBlob)
+	// TODO: populate descriptor status with Filecoin chain data about the stored blob.
+	return &storedBlob, err
 }
 
 func (r *RibsStore) Shutdown(_ context.Context) error {
