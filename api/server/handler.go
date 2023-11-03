@@ -1,6 +1,7 @@
 package server
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -32,7 +33,11 @@ func (m *HttpServer) handlePostBlob(w http.ResponseWriter, r *http.Request) {
 	if value := r.Header.Get("Content-Length"); value != "" {
 		var err error
 		if contentLength, err = strconv.ParseUint(value, 10, 32); err != nil {
-			respondWithJson(w, errResponseInvalidContentLength, http.StatusBadRequest)
+			if errors.Is(err, strconv.ErrSyntax) {
+				respondWithJson(w, errResponseInvalidContentLength, http.StatusBadRequest)
+			} else {
+				respondWithJson(w, errResponseContentLengthTooLarge(m.maxBlobLength), http.StatusBadRequest)
+			}
 			return
 		}
 		if contentLength > m.maxBlobLength {
