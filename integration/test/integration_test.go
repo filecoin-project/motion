@@ -100,9 +100,11 @@ func TestRoundTripPutStatusAndFullStorage(t *testing.T) {
 			var decoded api.GetStatusResponse
 			err = jsonResp.Decode(&decoded)
 			assert.NoError(c, err)
-			assert.Len(c, decoded.Replicas, 2)
-			assert.Len(c, decoded.Replicas[0].Pieces, 1)
-			assert.Len(c, decoded.Replicas[1].Pieces, 1)
+			assert.Len(t, decoded.Replicas, 2)
+			if len(decoded.Replicas) == 2 {
+				assert.Len(c, decoded.Replicas[0].Pieces, 1)
+				assert.Len(c, decoded.Replicas[1].Pieces, 1)
+			}
 		}, 2*time.Minute, 5*time.Second, "never initiated deal making")
 	}
 

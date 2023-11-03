@@ -13,7 +13,7 @@ import (
 )
 
 // io.ReadSeekCloser implementation that reads from remote singularity
-type SingularityReader struct {
+type Reader struct {
 	client *singularityclient.SingularityAPI
 	fileID uint64
 	offset int64
@@ -23,15 +23,15 @@ type SingularityReader struct {
 	rangeReader *rangeReader
 }
 
-func NewReader(client *singularityclient.SingularityAPI, fileID uint64, size int64) *SingularityReader {
-	return &SingularityReader{
+func NewReader(client *singularityclient.SingularityAPI, fileID uint64, size int64) *Reader {
+	return &Reader{
 		client: client,
 		fileID: fileID,
 		size:   size,
 	}
 }
 
-func (r *SingularityReader) Read(p []byte) (int, error) {
+func (r *Reader) Read(p []byte) (int, error) {
 	if r.offset >= r.size {
 		return 0, io.EOF
 	}
@@ -52,12 +52,12 @@ func (r *SingularityReader) Read(p []byte) (int, error) {
 
 // WriteTo is implemented in order to directly handle io.Copy operations
 // rather than allow small, separate Read operations.
-func (r *SingularityReader) WriteTo(w io.Writer) (int64, error) {
+func (r *Reader) WriteTo(w io.Writer) (int64, error) {
 	// Read all remaining bytes and write them to w.
 	return r.WriteToN(w, r.size-r.offset)
 }
 
-func (r *SingularityReader) WriteToN(w io.Writer, readLen int64) (int64, error) {
+func (r *Reader) WriteToN(w io.Writer, readLen int64) (int64, error) {
 	if r.offset >= r.size {
 		return 0, io.EOF
 	}
@@ -131,7 +131,7 @@ func (r *SingularityReader) WriteToN(w io.Writer, readLen int64) (int64, error) 
 	return read, nil
 }
 
-func (r *SingularityReader) Seek(offset int64, whence int) (int64, error) {
+func (r *Reader) Seek(offset int64, whence int) (int64, error) {
 	switch whence {
 	case io.SeekStart:
 	case io.SeekCurrent:
@@ -154,7 +154,7 @@ func (r *SingularityReader) Seek(offset int64, whence int) (int64, error) {
 	return r.offset, nil
 }
 
-func (r *SingularityReader) Close() error {
+func (r *Reader) Close() error {
 	var err error
 	if r.rangeReader != nil {
 		err = r.rangeReader.close()
@@ -163,7 +163,7 @@ func (r *SingularityReader) Close() error {
 	return err
 }
 
-func (r *SingularityReader) retrieveReader(ctx context.Context, fileID int64, byteRange string) io.ReadCloser {
+func (r *Reader) retrieveReader(ctx context.Context, fileID int64, byteRange string) io.ReadCloser {
 	// Start goroutine to read from singularity into write end of pipe.
 	reader, writer := io.Pipe()
 	go func() {
