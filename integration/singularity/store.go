@@ -7,9 +7,7 @@ import (
 	"io"
 	"math/big"
 	"net/http"
-	"os"
 	"path"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -36,12 +34,14 @@ var logger = log.Logger("motion/integration/singularity")
 
 type Store struct {
 	*options
-	local      *blob.LocalStore
-	sourceName string
-	toPack     chan uint64
-	closing    chan struct{}
-	closed     sync.WaitGroup
-	forcePack  *time.Ticker
+	local            *blob.LocalStore
+	idMap            *idMap
+	cleanupScheduler *cleanupScheduler
+	sourceName       string
+	toPack           chan uint64
+	closing          chan struct{}
+	closed           sync.WaitGroup
+	forcePack        *time.Ticker
 }
 
 func NewStore(o ...Option) (*Store, error) {
@@ -50,14 +50,23 @@ func NewStore(o ...Option) (*Store, error) {
 		return nil, fmt.Errorf("failed to init options: %w", err)
 	}
 
-	return &Store{
+	cleanupSchedulerCfg := cleanupSchedulerConfig{
+		interval: opts.cleanupInterval,
+	}
+
+	store := &Store{
 		options:    opts,
 		local:      blob.NewLocalStore(opts.storeDir, blob.WithMinFreeSpace(opts.minFreeSpace)),
+		idMap:      newIDMap(opts.storeDir),
 		sourceName: "source",
 		toPack:     make(chan uint64, 1),
 		closing:    make(chan struct{}),
 		forcePack:  time.NewTicker(opts.forcePackAfter),
-	}, nil
+	}
+
+	store.cleanupScheduler = newCleanupScheduler(cleanupSchedulerCfg, store.local, store.hasDealForAllProviders)
+
+	return store, nil
 }
 
 func (s *Store) initPreparation(ctx context.Context) (*models.ModelPreparation, error) {
@@ -282,11 +291,10 @@ func (s *Store) Start(ctx context.Context) error {
 		}
 	}
 
-	s.closed.Add(1)
-	go s.runPreparationJobs()
+	s.cleanupScheduler.start(ctx)
 
 	s.closed.Add(1)
-	go s.runCleanupWorker()
+	go s.runPreparationJobs()
 
 	return nil
 }
@@ -362,6 +370,8 @@ func (s *Store) Shutdown(ctx context.Context) error {
 		close(done)
 	}()
 
+	s.cleanupScheduler.stop(ctx)
+
 	select {
 	case <-ctx.Done():
 	case <-done:
@@ -394,25 +404,8 @@ func (s *Store) Put(ctx context.Context, reader io.Reader) (*blob.Descriptor, er
 		return nil, ctx.Err()
 	case s.toPack <- uint64(pushFileRes.Payload.ID):
 	}
-	idFile, err := os.CreateTemp(s.local.Dir(), "motion_local_store_*.bin.temp")
-	if err != nil {
-		return nil, fmt.Errorf("failed to create temporary file: %w", err)
-	}
-	defer func() {
-		if err := idFile.Close(); err != nil {
-			logger.Debugw("Failed to close temporary file", "err", err)
-		}
-	}()
-	_, err = idFile.Write([]byte(strconv.FormatUint(uint64(pushFileRes.Payload.ID), 10)))
-	if err != nil {
-		if err := os.Remove(idFile.Name()); err != nil {
-			logger.Debugw("Failed to remove temporary file", "path", idFile.Name(), "err", err)
-		}
-		return nil, fmt.Errorf("failed to write ID file: %w", err)
-	}
-	if err = os.Rename(idFile.Name(), path.Join(s.local.Dir(), desc.ID.String()+".id")); err != nil {
-		return nil, fmt.Errorf("failed to move ID file to store: %w", err)
-	}
+
+	s.idMap.insert(desc.ID, pushFileRes.Payload.ID)
 
 	logger.Infow("Stored blob successfully", "id", desc.ID.String(), "size", desc.Size, "singularityFileID", pushFileRes.Payload.ID)
 
@@ -420,20 +413,14 @@ func (s *Store) Put(ctx context.Context, reader io.Reader) (*blob.Descriptor, er
 }
 
 func (s *Store) PassGet(w http.ResponseWriter, r *http.Request, id blob.ID) {
-	fileIDString, err := os.ReadFile(filepath.Join(s.local.Dir(), id.String()+".id"))
+
+	fileID, err := s.idMap.get(id)
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			logger.Warnw("Cannot find requested id file", "id", id.String())
+		if errors.Is(err, blob.ErrBlobNotFound) {
 			http.Error(w, "", http.StatusNotFound)
 			return
 		}
-		logger.Errorw("Cannot read id file", "err", err, "id", id.String())
-		http.Error(w, "", http.StatusInternalServerError)
-		return
-	}
-	fileID, err := strconv.ParseUint(string(fileIDString), 10, 64)
-	if err != nil {
-		logger.Errorw("Cannot parse id file", "err", err, "id", id.String())
+
 		http.Error(w, "", http.StatusInternalServerError)
 		return
 	}
@@ -461,14 +448,14 @@ func (s *Store) PassGet(w http.ResponseWriter, r *http.Request, id blob.ID) {
 }
 
 func (s *Store) Get(ctx context.Context, id blob.ID) (io.ReadSeekCloser, error) {
-	fileIDString, err := os.ReadFile(filepath.Join(s.local.Dir(), id.String()+".id"))
+	fileID, err := s.idMap.get(id)
 	if err != nil {
-		return nil, err
+		if errors.Is(err, blob.ErrBlobNotFound) {
+			return nil, blob.ErrBlobNotFound
+		}
+		return nil, fmt.Errorf("could not get singularity file ID: %w", err)
 	}
-	fileID, err := strconv.ParseUint(string(fileIDString), 10, 64)
-	if err != nil {
-		return nil, err
-	}
+
 	getFileRes, err := s.singularityClient.File.GetFile(&file.GetFileParams{
 		Context: ctx,
 		ID:      int64(fileID),
@@ -481,21 +468,18 @@ func (s *Store) Get(ctx context.Context, id blob.ID) (io.ReadSeekCloser, error) 
 		return nil, fmt.Errorf("error loading singularity entry: %w", err)
 	}
 
-	return NewReader(s.singularityClient, fileID, getFileRes.Payload.Size), nil
+	return NewReader(s.singularityClient, uint64(fileID), getFileRes.Payload.Size), nil
 }
 
 func (s *Store) Describe(ctx context.Context, id blob.ID) (*blob.Descriptor, error) {
-	fileIDString, err := os.ReadFile(filepath.Join(s.local.Dir(), id.String()+".id"))
+	fileID, err := s.idMap.get(id)
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
+		if errors.Is(err, blob.ErrBlobNotFound) {
 			return nil, blob.ErrBlobNotFound
 		}
-		return nil, err
+		return nil, fmt.Errorf("could not get Singularity file ID: %w", err)
 	}
-	fileID, err := strconv.ParseUint(string(fileIDString), 10, 64)
-	if err != nil {
-		return nil, err
-	}
+
 	getFileRes, err := s.singularityClient.File.GetFile(&file.GetFileParams{
 		Context: ctx,
 		ID:      int64(fileID),
@@ -550,93 +534,19 @@ func (s *Store) Describe(ctx context.Context, id blob.ID) (*blob.Descriptor, err
 	return descriptor, nil
 }
 
-func (s *Store) runCleanupWorker() {
-	defer s.closed.Done()
-
-	// Run immediately once before starting ticker
-	s.runCleanupJob()
-
-	ticker := time.NewTicker(s.cleanupInterval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ticker.C:
-			s.runCleanupJob()
-		case <-s.closing:
-			return
-		}
-	}
-}
-
-func (s *Store) runCleanupJob() {
-	if err := s.cleanup(context.Background()); err != nil {
-		logger.Errorf("Local store cleanup failed: %w", err)
-	}
-}
-
-func (s *Store) cleanup(ctx context.Context) error {
-	logger.Info("Starting local store cleanup")
-
-	dir, err := os.ReadDir(s.local.Dir())
+// Returns true if the file has at least 1 deal for every SP.
+func (s *Store) hasDealForAllProviders(ctx context.Context, blobID blob.ID) (bool, error) {
+	fileID, err := s.idMap.get(blobID)
 	if err != nil {
-		return fmt.Errorf("failed to open local store directory: %w", err)
+		return false, fmt.Errorf("could not get Singularity file ID: %w", err)
 	}
 
-	var binsToDelete []string
-
-	for _, entry := range dir {
-		binFileName := entry.Name()
-
-		id, entryIsBin := strings.CutSuffix(binFileName, ".bin")
-		if !entryIsBin {
-			continue
-		}
-
-		idFileName := id + ".id"
-		fileIDString, err := os.ReadFile(filepath.Join(s.local.Dir(), idFileName))
-		if err != nil {
-			logger.Warnw("Failed to open ID map file", "err", err, "id", id)
-			continue
-		}
-		fileID, err := strconv.ParseUint(string(fileIDString), 10, 64)
-		if err != nil {
-			logger.Warnw("Failed to parse file ID as integer", "err", err, "fileID", fileIDString)
-			continue
-		}
-
-		if !s.hasDealForAllProviders(ctx, int64(fileID)) {
-			// If no deal was found for this file and SP, the local bin file
-			// cannot be deleted yet - continue to the next one
-			continue
-		}
-
-		// If deals have been made for all SPs, the local bin file can be
-		// deleted
-		logger.Infow("Deleting local copy for deal", "id", id, "file", binFileName)
-		binsToDelete = append(binsToDelete, binFileName)
-	}
-
-	for _, binFileName := range binsToDelete {
-		if err = os.Remove(filepath.Join(s.local.Dir(), binFileName)); err != nil {
-			logger.Warnw("Failed to delete local bin file that was staged for removal", "err", err, "file", binFileName)
-		}
-	}
-	logger.Infow("Cleaned up unneeded local files", "count", len(binsToDelete))
-
-	return nil
-}
-
-// hasDealForAllProviders returns true if the file has at least 1 deal for
-// every SP.
-func (s *Store) hasDealForAllProviders(ctx context.Context, fileID int64) bool {
 	getFileDealsRes, err := s.singularityClient.File.GetFileDeals(&file.GetFileDealsParams{
 		Context: ctx,
 		ID:      fileID,
 	})
 	if err != nil {
-		logger.Warnw("Failed to get file deals", "err", err, "file", fileID)
-		return false
+		return false, fmt.Errorf("failed to get file deals: %w", err)
 	}
 
 	// Make sure the file has at least 1 deal for every SP
@@ -649,9 +559,9 @@ func (s *Store) hasDealForAllProviders(ctx context.Context, fileID int64) bool {
 			}
 		}
 		if !foundDealForSP {
-			return false
+			return false, nil
 		}
 	}
 
-	return true
+	return true, nil
 }
