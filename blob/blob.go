@@ -16,9 +16,7 @@ var (
 	ErrBlobNotFound = errors.New("no blob is found with given ID")
 )
 
-var (
-	logger = log.Logger("motion/blobstore")
-)
+var logger = log.Logger("motion/blobstore")
 
 type (
 	// ID uniquely identifies a blob.
@@ -38,6 +36,7 @@ type (
 		Pieces   []Piece
 	}
 	Piece struct {
+		Id          int64
 		Expiration  time.Time
 		LastUpdated time.Time
 		PieceCID    string
