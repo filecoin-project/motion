@@ -32,7 +32,7 @@ func (m *HttpServer) handlePostBlob(w http.ResponseWriter, r *http.Request) {
 	var contentLength uint64
 	if value := r.Header.Get("Content-Length"); value != "" {
 		var err error
-		if contentLength, err = strconv.ParseUint(value, 10, 32); err != nil {
+		if contentLength, err = strconv.ParseUint(value, 10, 64); err != nil {
 			if errors.Is(err, strconv.ErrSyntax) {
 				respondWithJson(w, errResponseInvalidContentLength, http.StatusBadRequest)
 			} else {
