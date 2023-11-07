@@ -421,6 +421,7 @@ func (s *Store) PassGet(w http.ResponseWriter, r *http.Request, id blob.ID) {
 			return
 		}
 
+		logger.Errorw("Could not get singularity file ID", "err", err)
 		http.Error(w, "", http.StatusInternalServerError)
 		return
 	}

@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"strconv"
 
@@ -22,7 +21,7 @@ func newIDMap(dir string) *idMap {
 }
 
 func (im *idMap) path(blobID blob.ID) string {
-	return path.Join(im.dir, blobID.String()+".id")
+	return filepath.Join(im.dir, blobID.String()+".id")
 }
 
 // Inserts a blob ID to Singularity ID mapping.
@@ -53,7 +52,7 @@ func (im *idMap) insert(blobID blob.ID, singularityID int64) error {
 // Maps blob ID to Singularity ID. Returns blob.ErrBlobNotFound if no mapping
 // exists.
 func (im *idMap) get(blobID blob.ID) (int64, error) {
-	fileIDString, err := os.ReadFile(filepath.Join(im.dir, blobID.String()+".id"))
+	fileIDString, err := os.ReadFile(im.path(blobID))
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return 0, blob.ErrBlobNotFound

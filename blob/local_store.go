@@ -143,6 +143,11 @@ func (l *LocalStore) List(ctx context.Context) ([]ID, error) {
 	}
 
 	for _, binFileEntry := range dir {
+		if binFileEntry.IsDir() {
+			// Do not include directories
+			continue
+		}
+
 		idString, isBin := strings.CutSuffix(binFileEntry.Name(), ".bin")
 		if !isBin {
 			// Do not include files that don't end in .bin
