@@ -15,7 +15,7 @@ import (
 )
 
 func TestCleanupScheduler(t *testing.T) {
-	localDir := filepath.Join(os.TempDir(), "motion-cleanup-test")
+	localDir := filepath.Join(t.TempDir(), "motion-cleanup-test")
 	require.NoError(t, os.MkdirAll(localDir, 0777))
 	local := blob.NewLocalStore(localDir)
 
