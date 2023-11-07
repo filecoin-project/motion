@@ -70,16 +70,17 @@ func (im *idMap) get(blobID blob.ID) (int64, error) {
 	return int64(fileID), nil
 }
 
-// Removes blob ID to Singularity ID mapping. If no ID file existed,
-// blob.ErrBlobNotFound will be returned.
-func (im *idMap) remove(blobID blob.ID) error {
-	if err := os.Remove(im.path(blobID)); err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return blob.ErrBlobNotFound
-		}
+// TODO: currently commented to silence unused warning
+// // Removes blob ID to Singularity ID mapping. If no ID file existed,
+// // blob.ErrBlobNotFound will be returned.
+// func (im *idMap) remove(blobID blob.ID) error {
+// 	if err := os.Remove(im.path(blobID)); err != nil {
+// 		if errors.Is(err, os.ErrNotExist) {
+// 			return blob.ErrBlobNotFound
+// 		}
 
-		return fmt.Errorf("could not read ID file: %w", err)
-	}
+// 		return fmt.Errorf("could not read ID file: %w", err)
+// 	}
 
-	return nil
-}
+// 	return nil
+// }
