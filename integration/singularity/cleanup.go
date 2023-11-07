@@ -67,7 +67,7 @@ func (cs *cleanupScheduler) start(ctx context.Context) {
 	}()
 }
 
-func (cs *cleanupScheduler) stop(ctx context.Context) {
+func (cs *cleanupScheduler) stop(ctx context.Context) error {
 	close(cs.closing)
 
 	done := make(chan struct{})
@@ -78,7 +78,9 @@ func (cs *cleanupScheduler) stop(ctx context.Context) {
 
 	select {
 	case <-ctx.Done():
+		return ctx.Err()
 	case <-done:
+		return nil
 	}
 }
 

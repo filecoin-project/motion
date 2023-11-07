@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -19,6 +20,7 @@ func TestCleanupScheduler(t *testing.T) {
 	require.NoError(t, os.MkdirAll(localDir, 0777))
 	local := blob.NewLocalStore(localDir)
 
+	var lock sync.Mutex
 	var cleanupNotReadyBlobs []blob.ID
 	var cleanupReadyBlobs []blob.ID
 
@@ -47,6 +49,8 @@ func TestCleanupScheduler(t *testing.T) {
 
 	// Returns true if the value is present in the shouldRemove slice
 	callback := func(ctx context.Context, blobID blob.ID) (bool, error) {
+		lock.Lock()
+		defer lock.Unlock()
 		for _, other := range cleanupReadyBlobs {
 			if blobID == other {
 				return true, nil
@@ -63,12 +67,14 @@ func TestCleanupScheduler(t *testing.T) {
 	listBefore, err := local.List(context.Background())
 	t.Logf("length before: %v", len(listBefore))
 	require.NoError(t, err)
+	lock.Lock()
 	for _, blob := range cleanupNotReadyBlobs {
 		require.Contains(t, listBefore, blob)
 	}
 	for _, blob := range cleanupReadyBlobs {
 		require.Contains(t, listBefore, blob)
 	}
+	lock.Unlock()
 
 	// Start cleanup scheduler and check that all cleanup ready blobs are
 	// already removed before the first cleanup tick, since there should be one
@@ -81,16 +87,20 @@ func TestCleanupScheduler(t *testing.T) {
 	listAfterStart, err := local.List(context.Background())
 	t.Logf("length after start: %v", len(listAfterStart))
 	require.NoError(t, err)
+	lock.Lock()
 	for _, blob := range cleanupNotReadyBlobs {
 		require.Contains(t, listAfterStart, blob)
 	}
 	for _, blob := range cleanupReadyBlobs {
 		require.NotContains(t, listAfterStart, blob)
 	}
+	lock.Unlock()
 
 	// Add the rest of the blobs to cleanup ready, wait for 1 more tick, and
 	// make sure that no more blobs are left
+	lock.Lock()
 	cleanupReadyBlobs = append(cleanupReadyBlobs, cleanupNotReadyBlobs...)
+	lock.Unlock()
 
 	time.Sleep(cfg.interval)
 
@@ -98,4 +108,6 @@ func TestCleanupScheduler(t *testing.T) {
 	t.Logf("length after tick: %v", len(listAfterTick))
 	require.NoError(t, err)
 	require.Empty(t, listAfterTick)
+
+	require.NoError(t, cleanupScheduler.stop(context.Background()))
 }
