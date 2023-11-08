@@ -52,7 +52,7 @@ func NewStore(o ...Option) (*Store, error) {
 
 	return &Store{
 		options:    opts,
-		local:      blob.NewLocalStore(opts.storeDir),
+		local:      blob.NewLocalStore(opts.storeDir, opts.minFreeSpace),
 		sourceName: "source",
 		toPack:     make(chan uint64, 1),
 		closing:    make(chan struct{}),

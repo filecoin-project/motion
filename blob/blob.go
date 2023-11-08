@@ -12,8 +12,9 @@ import (
 )
 
 var (
-	ErrBlobTooLarge = errors.New("blob size exceeds the maximum allowed")
-	ErrBlobNotFound = errors.New("no blob is found with given ID")
+	ErrBlobNotFound   = errors.New("no blob is found with given ID")
+	ErrBlobTooLarge   = errors.New("blob size exceeds the maximum allowed")
+	ErrNotEnoughSpace = errors.New("insufficient local storage space remaining")
 )
 
 var (

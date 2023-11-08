@@ -6,6 +6,7 @@ require (
 	github.com/data-preservation-programs/singularity v0.5.8
 	github.com/filecoin-project/go-address v1.1.0
 	github.com/filecoin-project/go-state-types v0.12.0
+	github.com/gammazero/fsutil v0.0.1
 	github.com/google/uuid v1.3.1
 	github.com/gotidy/ptr v1.4.0
 	github.com/ipfs/go-log/v2 v2.5.1
@@ -160,7 +161,7 @@ require (
 	golang.org/x/mod v0.12.0 // indirect
 	golang.org/x/net v0.17.0 // indirect
 	golang.org/x/sync v0.3.0 // indirect
-	golang.org/x/sys v0.13.0 // indirect
+	golang.org/x/sys v0.14.0 // indirect
 	golang.org/x/text v0.13.0 // indirect
 	golang.org/x/tools v0.12.1-0.20230815132531-74c255bcf846 // indirect
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect

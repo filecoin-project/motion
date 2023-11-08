@@ -37,6 +37,12 @@ func main() {
 				Value:       os.TempDir(),
 				EnvVars:     []string{"MOTION_STORE_DIR"},
 			},
+			&cli.Uint64Flag{
+				Name:        "minFreeDiskSpace",
+				Usage:       "Minumum amount of free space that must remaio on disk after writing blob",
+				DefaultText: "64 Mib",
+				EnvVars:     []string{"MIN_FREE_DISK_SPACE"},
+			},
 			&cli.StringFlag{
 				Name:    "walletKey",
 				Usage:   "Hex encoded private key for the wallet to use with motion",
@@ -205,6 +211,7 @@ func main() {
 					singularity.WithScheduleDealNumber(cctx.Int("experimentalSingularityScheduleDealNumber")),
 					singularity.WithVerifiedDeal(cctx.Bool("verifiedDeal")),
 					singularity.WithCleanupInterval(cctx.Duration("experimentalSingularityCleanupInterval")),
+					singularity.WithMinFreeSpace(cctx.Uint64("minFreeDiskSpace")),
 				)
 				if err != nil {
 					logger.Errorw("Failed to instantiate singularity store", "err", err)
@@ -222,7 +229,7 @@ func main() {
 				}()
 				store = singularityStore
 			} else {
-				store = blob.NewLocalStore(storeDir)
+				store = blob.NewLocalStore(storeDir, cctx.Uint64("minFreeDiskSpace"))
 				logger.Infow("Using local blob store", "storeDir", storeDir)
 			}
 
