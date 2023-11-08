@@ -51,10 +51,10 @@ func (cs *cleanupScheduler) start(ctx context.Context) {
 		}()
 
 		ticker := time.NewTicker(cs.cfg.interval)
+		defer ticker.Stop()
 
 		// Run once immediately on startup
 		cs.cleanup(ctx)
-		defer ticker.Stop()
 
 		for {
 			select {
