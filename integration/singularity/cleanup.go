@@ -85,6 +85,8 @@ func (cs *cleanupScheduler) stop(ctx context.Context) error {
 }
 
 func (cs *cleanupScheduler) cleanup(ctx context.Context) error {
+	logger.Info("Starting cleanup")
+
 	ids, err := cs.local.List(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to list local blob IDs: %w", err)
@@ -94,7 +96,7 @@ func (cs *cleanupScheduler) cleanup(ctx context.Context) error {
 	for _, id := range ids {
 		cleanupReady, err := cs.cleanupReady(ctx, id)
 		if err != nil {
-			logger.Warnf("failed to check if blob is ready for cleanup, skipping for this cleanup cycle: %w", err)
+			logger.Warnw("failed to check if blob is ready for cleanup, skipping for this cleanup cycle", "err", err)
 			continue
 		}
 		if cleanupReady {
@@ -104,6 +106,12 @@ func (cs *cleanupScheduler) cleanup(ctx context.Context) error {
 
 	for _, blobID := range removals {
 		cs.local.Remove(ctx, blobID)
+	}
+
+	if len(removals) > 0 {
+		logger.Infow("Cleaned up unneeded local files", "count", len(removals))
+	} else {
+		logger.Info("Did not find any local files to clean up")
 	}
 
 	return nil

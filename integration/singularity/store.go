@@ -323,6 +323,7 @@ func (s *Store) runPreparationJobs() {
 				logger.Errorw("Failed to prepare to pack file", "fileID", fileID, "error", err)
 				continue
 			}
+			logger.Infow("Prepared file for packing", "fileID", fileID)
 			if prepareToPackFileRes.Payload > s.packThreshold {
 				if err := s.prepareToPackSource(ctx); err != nil {
 					logger.Errorw("Failed to prepare to pack source", "error", err)
@@ -552,9 +553,14 @@ func (s *Store) hasDealForAllProviders(ctx context.Context, blobID blob.ID) (boo
 
 	// Make sure the file has at least 1 deal for every SP
 	for _, sp := range s.storageProviders {
-		var foundDealForSP bool
+		foundDealForSP := false
 		for _, deal := range getFileDealsRes.Payload {
-			if deal.Provider == sp.String() && (deal.State == models.ModelDealStatePublished || deal.State == models.ModelDealStateActive) {
+			// Only check state for current provider
+			if deal.Provider != sp.String() {
+				continue
+			}
+
+			if deal.State == models.ModelDealStatePublished || deal.State == models.ModelDealStateActive {
 				foundDealForSP = true
 				break
 			}
