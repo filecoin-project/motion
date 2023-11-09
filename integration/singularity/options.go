@@ -43,7 +43,7 @@ type (
 		maxPendingDealSize    string
 		maxPendingDealNumber  int
 		cleanupInterval       time.Duration
-		minFreeSpace          uint64
+		minFreeSpace          int64
 	}
 )
 
@@ -334,8 +334,9 @@ func WithCleanupInterval(v time.Duration) Option {
 }
 
 // WithMinFreeSpce configures the minimul free disk space that must remain
-// after storing a blob. A value of zero uses the default value.
-func WithMinFreeSpace(space uint64) Option {
+// after storing a blob. A value of zero uses the default value and -1 disabled
+// checks.
+func WithMinFreeSpace(space int64) Option {
 	return func(o *options) error {
 		o.minFreeSpace = space
 		return nil

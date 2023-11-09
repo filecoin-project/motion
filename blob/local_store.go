@@ -13,14 +13,6 @@ import (
 
 var _ Store = (*LocalStore)(nil)
 
-const (
-	Kib = 1 << (10 * (iota + 1))
-	Mib
-	Gib
-)
-
-const defaultMinFreeSpace = 64 * Mib
-
 // LocalStore is a Store that stores blobs as flat files in a configured directory.
 // Blobs are stored as flat files, named by their ID with .bin extension.
 // This store is used primarily for testing purposes.
@@ -31,14 +23,12 @@ type LocalStore struct {
 
 // NewLocalStore instantiates a new LocalStore and uses the given dir as the place to store blobs.
 // Blobs are stored as flat files, named by their ID with .bin extension.
-func NewLocalStore(dir string, minFreeSpace uint64) *LocalStore {
-	if minFreeSpace == 0 {
-		minFreeSpace = defaultMinFreeSpace
-	}
+func NewLocalStore(dir string, options ...Option) *LocalStore {
+	opts := getOpts(options)
 	logger.Debugw("Instantiated local store", "dir", dir)
 	return &LocalStore{
 		dir:          dir,
-		minFreeSpace: minFreeSpace,
+		minFreeSpace: opts.minFreeSpace,
 	}
 }
 
@@ -58,13 +48,20 @@ func (l *LocalStore) Dir() string {
 // Before a blob is written, the minimum amount of free space must be available
 // on the local disk. If writing the blob consumes more then the available
 // space (free space - minimum free), then this results in an error.
-func (l *LocalStore) Put(_ context.Context, reader io.ReadCloser) (*Descriptor, error) {
-	usage, err := disk.Usage(l.dir)
-	if err != nil {
-		return nil, fmt.Errorf("cannot get disk usage: %w", err)
-	}
-	if usage.Free <= l.minFreeSpace {
-		return nil, ErrNotEnoughSpace
+func (l *LocalStore) Put(_ context.Context, reader io.Reader) (*Descriptor, error) {
+	var limit int64
+	if l.minFreeSpace != 0 {
+		usage, err := disk.Usage(l.dir)
+		if err != nil {
+			return nil, fmt.Errorf("cannot get disk usage: %w", err)
+		}
+		if usage.Free <= l.minFreeSpace {
+			return nil, ErrNotEnoughSpace
+		}
+
+		// Do not write more than the remaining storage - minimum free space.
+		limit = int64(usage.Free - l.minFreeSpace)
+		reader = io.LimitReader(reader, limit)
 	}
 
 	dest, err := os.CreateTemp(l.dir, "motion_local_store_*.bin.temp")
@@ -73,16 +70,13 @@ func (l *LocalStore) Put(_ context.Context, reader io.ReadCloser) (*Descriptor, 
 	}
 	defer dest.Close()
 
-	// Do not write more than the remaining storage - minimum free space.
-	limit := int64(usage.Free - l.minFreeSpace)
-	limitReader := io.LimitReader(reader, limit)
-
-	written, err := io.Copy(dest, limitReader)
+	written, err := io.Copy(dest, reader)
 	if err != nil {
 		os.Remove(dest.Name())
 		return nil, err
 	}
-	if written == limit {
+
+	if limit != 0 && written == limit {
 		os.Remove(dest.Name())
 		return nil, ErrBlobTooLarge
 	}

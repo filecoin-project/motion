@@ -26,7 +26,7 @@ func newOptions(o ...Option) (*options, error) {
 	if opts.blobStore == nil {
 		dir := os.TempDir()
 		logger.Warnw("No blob store is specified. Falling back on local blob store in temporary directory.", "dir", dir)
-		opts.blobStore = blob.NewLocalStore(dir, 0)
+		opts.blobStore = blob.NewLocalStore(dir)
 	}
 	return opts, nil
 }

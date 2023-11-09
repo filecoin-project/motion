@@ -14,7 +14,7 @@ import (
 func TestWriteOK(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	store := blob.NewLocalStore(tmpDir, 0)
+	store := blob.NewLocalStore(tmpDir)
 	buf := []byte("This is a test")
 	readCloser := io.NopCloser(bytes.NewReader(buf))
 
@@ -29,7 +29,7 @@ func TestInsufficientSpace(t *testing.T) {
 	usage, err := disk.Usage(tmpDir)
 	require.NoError(t, err)
 
-	store := blob.NewLocalStore(tmpDir, usage.Free+blob.Gib)
+	store := blob.NewLocalStore(tmpDir, blob.WithMinFreeSpace(int64(usage.Free+blob.Gib)))
 	readCloser := io.NopCloser(bytes.NewReader([]byte("This is a test")))
 
 	_, err = store.Put(context.Background(), readCloser)
@@ -41,7 +41,7 @@ func TestWriteTooLarge(t *testing.T) {
 	usage, err := disk.Usage(tmpDir)
 	require.NoError(t, err)
 
-	store := blob.NewLocalStore(tmpDir, usage.Free-5*blob.Kib)
+	store := blob.NewLocalStore(tmpDir, blob.WithMinFreeSpace(int64(usage.Free-5*blob.Kib)))
 
 	buf := make([]byte, 32*blob.Kib)
 	readCloser := io.NopCloser(bytes.NewReader(buf))

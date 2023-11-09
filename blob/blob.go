@@ -45,7 +45,7 @@ type (
 		Status      string
 	}
 	Store interface {
-		Put(context.Context, io.ReadCloser) (*Descriptor, error)
+		Put(context.Context, io.Reader) (*Descriptor, error)
 		Describe(context.Context, ID) (*Descriptor, error)
 		Get(context.Context, ID) (io.ReadSeekCloser, error)
 	}
