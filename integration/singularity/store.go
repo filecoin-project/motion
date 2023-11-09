@@ -52,7 +52,7 @@ func NewStore(o ...Option) (*Store, error) {
 
 	return &Store{
 		options:    opts,
-		local:      blob.NewLocalStore(opts.storeDir),
+		local:      blob.NewLocalStore(opts.storeDir, blob.WithMinFreeSpace(opts.minFreeSpace)),
 		sourceName: "source",
 		toPack:     make(chan uint64, 1),
 		closing:    make(chan struct{}),
@@ -374,7 +374,7 @@ func (s *Store) Shutdown(ctx context.Context) error {
 	return nil
 }
 
-func (s *Store) Put(ctx context.Context, reader io.ReadCloser) (*blob.Descriptor, error) {
+func (s *Store) Put(ctx context.Context, reader io.Reader) (*blob.Descriptor, error) {
 	desc, err := s.local.Put(ctx, reader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to put file locally: %w", err)

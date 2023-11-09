@@ -12,8 +12,9 @@ import (
 )
 
 var (
-	ErrBlobTooLarge = errors.New("blob size exceeds the maximum allowed")
-	ErrBlobNotFound = errors.New("no blob is found with given ID")
+	ErrBlobNotFound   = errors.New("no blob is found with given ID")
+	ErrBlobTooLarge   = errors.New("blob size exceeds the maximum allowed")
+	ErrNotEnoughSpace = errors.New("insufficient local storage space remaining")
 )
 
 var (
@@ -44,7 +45,7 @@ type (
 		Status      string
 	}
 	Store interface {
-		Put(context.Context, io.ReadCloser) (*Descriptor, error)
+		Put(context.Context, io.Reader) (*Descriptor, error)
 		Describe(context.Context, ID) (*Descriptor, error)
 		Get(context.Context, ID) (io.ReadSeekCloser, error)
 	}

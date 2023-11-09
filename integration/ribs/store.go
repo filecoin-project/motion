@@ -86,7 +86,7 @@ func (s *Store) Start(_ context.Context) error {
 	// TODO: change RIBS to take context.
 	return s.ribs.Start()
 }
-func (s *Store) Put(ctx context.Context, in io.ReadCloser) (*blob.Descriptor, error) {
+func (s *Store) Put(ctx context.Context, in io.Reader) (*blob.Descriptor, error) {
 
 	// Generate ID early to fail early if generation fails.
 	id, err := uuid.NewRandom()
