@@ -25,7 +25,7 @@ Set the following environment variables to point AWS CLI to the test server:
 ```
 export AWS_ACCESS_KEY_ID=accessKey1
 export AWS_SECRET_ACCESS_KEY=verySecretKey1
-export AWS_DEFAULT_REGION=location-motion-v1 \
+export AWS_DEFAULT_REGION=location-motion-v1
 export AWS_ENDPOINT_URL=http://localhost:8000
 ```
 
