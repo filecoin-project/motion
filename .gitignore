@@ -2,6 +2,7 @@
 /.env.local
 integration/test/devnet/data
 motion
+integration/test/s3-connector/.up
 integration/test/motionlarity/.env.local
 integration/test/motionlarity/.up
 integration/test/devnet/.up

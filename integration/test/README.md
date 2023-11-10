@@ -8,11 +8,34 @@ It's intended both as an integration test to run in CI, and a platform for devel
 
 All devnets are spun up with `make`. Key commands:
 
+- `make all/up` - starts all test components
 - `make devnet/up` - will spin up a boost / lotus devnet
 - `make motionlarity/up` - will spin up motion and singularity pre-configured to make deals with a lotus/boost devnet. if a lotus / boost devnet is not already spun up, this will spin one up
+- `make s3-connector/up` - will start the s3 connector, as well as motionlarity and devnet if not already running
 - `make test` - this will run the integration test on top of the motion/singularity/boost/lotus devnets. It will spin up all required networks that are not already running
-- `make motionalirity/down` -- this will shut down motion and singularity processes
-- `make devnet/down` -- this will shut down the boost/lotus devnet. If singularity and motion processes running, it will shut them down as well
+- `make s3-connector-down` - will shut down s3 connector (motionlarity and devnet will NOT be stopped)
+- `make motionlarity/down` - this will shut down motion and singularity processes, as well as the s3 connector if running (devnet will NOT be stopped)
+- `make devnet/down` - this will shut down the boost/lotus devnet. If singularity and motion processes running, it will shut them down as well
+- `make all/down` - stops all test components
+
+### Testing with S3 CLI
+
+Set the following environment variables to point AWS CLI to the test server:
+
+```
+export AWS_ACCESS_KEY_ID=accessKey1
+export AWS_SECRET_ACCESS_KEY=verySecretKey1
+export AWS_DEFAULT_REGION=location-motion-v1 \
+export AWS_ENDPOINT_URL=http://localhost:8000
+```
+
+Simple bucket creation / upload / download:
+
+```
+aws s3 mb s3://test
+aws s3 cp ./myfile s3://test
+aws s3 cp s3://test/myfile ./myfile-retrieved
+```
 
 ### Using local singularity
 
