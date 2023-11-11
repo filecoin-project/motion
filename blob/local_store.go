@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"strings"
+
 	"github.com/gammazero/fsutil/disk"
 )
 
@@ -127,4 +129,53 @@ func (l *LocalStore) Describe(ctx context.Context, id ID) (*Descriptor, error) {
 		Size:             uint64(stat.Size()),
 		ModificationTime: stat.ModTime(),
 	}, nil
+}
+
+// Lists all locally stored blob IDs. Files in the local store directory which
+// do not end in ".bin", or which cannot be parsed into a blob ID, will not be
+// included.
+func (l *LocalStore) List(ctx context.Context) ([]ID, error) {
+	var ids []ID
+
+	dir, err := os.ReadDir(l.dir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read local store directory: %w", err)
+	}
+
+	for _, binFileEntry := range dir {
+		if binFileEntry.IsDir() {
+			// Do not include directories
+			continue
+		}
+
+		idString, isBin := strings.CutSuffix(binFileEntry.Name(), ".bin")
+		if !isBin {
+			// Do not include files that don't end in .bin
+			continue
+		}
+
+		var id ID
+		if err := id.Decode(idString); err != nil {
+			// Do not include files that cannot be parsed into a blob ID
+			continue
+		}
+
+		ids = append(ids, ID(id))
+	}
+
+	return ids, nil
+}
+
+// Removes the blob. Errors with ErrBlobNotFound if the blob does not exist.
+func (l *LocalStore) Remove(ctx context.Context, id ID) error {
+	binFileName := id.String() + ".bin"
+	if err := os.Remove(filepath.Join(l.dir, binFileName)); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return ErrBlobNotFound
+		}
+
+		return fmt.Errorf("failed to remove bin file '%s': %w", binFileName, err)
+	}
+
+	return nil
 }
