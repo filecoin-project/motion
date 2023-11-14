@@ -71,7 +71,7 @@ services:
     image: ghcr.io/data-preservation-programs/singularity${SINGULARITY_REF}
     volumes:
       - motion-singularity-volume:/usr/src/app/storage
-    command: run deal-pusher
+    command: run deal-pusher --max-replication-factor ${MOTION_REPLICATION_FACTOR:-0}
     environment:
       DATABASE_CONNECTION_STRING: postgres://${SINGULARITY_DB_USER:-postgres}:${SINGULARITY_DB_PASSWORD:-postgres}@db:5432/${SINGULARITY_DB_NAME:-singularity}
       LOTUS_TEST:
