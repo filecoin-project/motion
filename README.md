@@ -55,7 +55,9 @@ MOTION_STORAGE_PROVIDERS=
 # The private key of the wallet you will use with motion, in hexadecimal format.
 # This is the output of `lotus wallet export ~address~` if you are using lotus
 # If you are obtaining a wallet through another method follow your wallet providers
-# instructions to get your wallet's provider key
+# instructions to get your wallet's provider key.
+# This wallet must exist on the chain. If it is a newly created wallet, you may send 0 FIL to it
+# to ensure it is on chain.
 MOTION_WALLET_KEY=
 
 # This is the domain/IP you will expose publicly to transfer data to storage providers
