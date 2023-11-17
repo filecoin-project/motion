@@ -49,8 +49,8 @@ github.com/cpuguy83/go-md2man/v2 v2.0.2 h1:p1EgwI/C7NhT0JmVkwCD2ZBK8j4aeHQX2pMHH
 github.com/cpuguy83/go-md2man/v2 v2.0.2/go.mod h1:tgQtvFlXSQOSOSIRvRPT7W67SCa46tRHOmNcaadrF8o=
 github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
 github.com/cskr/pubsub v1.0.2 h1:vlOzMhl6PFn60gRlTQQsIfVwaPB/B/8MziK8FhEPt/0=
-github.com/data-preservation-programs/singularity v0.5.9 h1:BuZBrNx9N2GHmCveJsoXHL0EAqdyixIdvzvFSt+oQmA=
-github.com/data-preservation-programs/singularity v0.5.9/go.mod h1:p3Morz6kp3e12dRJs1rkALFCHlFjbkmM+TwnRk7sWG4=
+github.com/data-preservation-programs/singularity v0.5.10 h1:uPM6xk6lWP8ddrEo3eumbvX5p0gcyY1x92taEhqrfe8=
+github.com/data-preservation-programs/singularity v0.5.10/go.mod h1:p3Morz6kp3e12dRJs1rkALFCHlFjbkmM+TwnRk7sWG4=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=

@@ -511,32 +511,42 @@ func (s *Store) Describe(ctx context.Context, id blob.ID) (*blob.Descriptor, err
 		return nil, err
 	}
 
-	if len(getFileDealsRes.Payload) == 0 {
+	dealsForRanges := getFileDealsRes.GetPayload()
+	if len(dealsForRanges) == 0 {
 		return descriptor, nil
 	}
 
-	replicas := make([]blob.Replica, 0, len(getFileDealsRes.Payload))
-	for _, deal := range getFileDealsRes.Payload {
-		updatedAt, err := time.Parse("2006-01-02 15:04:05-07:00", deal.LastVerifiedAt)
-		if err != nil {
-			updatedAt = time.Time{}
+	var replicas []blob.Replica
+	for i := range dealsForRanges {
+		dealsForRange := dealsForRanges[i].Deals
+		for _, deal := range dealsForRange {
+			updatedAt, err := time.Parse("2006-01-02 15:04:05-07:00", deal.LastVerifiedAt)
+			if err != nil {
+				updatedAt = time.Time{}
+			}
+			piece := blob.Piece{
+				Expiration:  epochutil.EpochToTime(int32(deal.EndEpoch)),
+				LastUpdated: updatedAt,
+				PieceCID:    deal.PieceCid,
+				Status:      string(deal.State),
+			}
+			replicas = append(replicas, blob.Replica{
+				Provider: deal.Provider,
+				Pieces:   []blob.Piece{piece},
+			})
 		}
-		piece := blob.Piece{
-			Expiration:  epochutil.EpochToTime(int32(deal.EndEpoch)),
-			LastUpdated: updatedAt,
-			PieceCID:    deal.PieceCid,
-			Status:      string(deal.State),
-		}
-		replicas = append(replicas, blob.Replica{
-			Provider: deal.Provider,
-			Pieces:   []blob.Piece{piece},
-		})
 	}
 	descriptor.Replicas = replicas
 	return descriptor, nil
 }
 
-// Returns true if the file has at least 1 deal for every SP.
+// Returns true if the file has at least 1 deal for every SP, for every range of the file.
+//
+// - If no file ranges, returns true.
+// - If no storage providers, returns true.
+// - If no deals in any file range, returns false.
+// - If any range does not have a deal with at least one SP, returns false.
+// - If all ranges have a deal with at least one SP, return true.
 func (s *Store) hasDealForAllProviders(ctx context.Context, blobID blob.ID) (bool, error) {
 	fileID, err := s.idMap.get(blobID)
 	if err != nil {
@@ -551,24 +561,34 @@ func (s *Store) hasDealForAllProviders(ctx context.Context, blobID blob.ID) (boo
 		return false, fmt.Errorf("failed to get file deals: %w", err)
 	}
 
-	// Make sure the file has at least 1 deal for every SP
-	for _, sp := range s.storageProviders {
-		foundDealForSP := false
-		for _, deal := range getFileDealsRes.Payload {
-			// Only check state for current provider
-			if deal.Provider != sp.String() {
-				continue
-			}
+	dealsForRanges := getFileDealsRes.GetPayload()
 
-			if deal.State == models.ModelDealStatePublished || deal.State == models.ModelDealStateActive {
-				foundDealForSP = true
-				break
+	// Make sure the file has at least 1 deal for every SP and every range of this file.
+	for i := range dealsForRanges {
+		dealsForRange := dealsForRanges[i].Deals
+		// Check that each SP has a deal.
+		for _, sp := range s.storageProviders {
+			// Return false if this range has no
+			if !storageProviderHasAnyDeal(sp, dealsForRange) {
+				return false, nil
 			}
-		}
-		if !foundDealForSP {
-			return false, nil
 		}
 	}
 
 	return true, nil
+}
+
+func storageProviderHasAnyDeal(sp address.Address, deals []*models.ModelDeal) bool {
+	// Find a deal for this SP.
+	for _, deal := range deals {
+		// Only check state for current provider
+		if deal.Provider != sp.String() {
+			continue
+		}
+		if deal.State == models.ModelDealStatePublished || deal.State == models.ModelDealStateActive {
+			return true
+		}
+	}
+	// The storage provider did not have any of the deals.
+	return false
 }
