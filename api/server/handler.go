@@ -167,6 +167,7 @@ func (m *HttpServer) handleBlobGetStatusByID(w http.ResponseWriter, r *http.Requ
 			apiPieces := make([]api.Piece, 0, len(replica.Pieces))
 			for _, piece := range replica.Pieces {
 				apiPieces = append(apiPieces, api.Piece{
+					Id:           piece.Id,
 					Expiration:   piece.Expiration,
 					LastVerified: piece.LastUpdated,
 					PieceCID:     piece.PieceCID,

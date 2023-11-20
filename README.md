@@ -142,6 +142,7 @@ curl http://localhost:40080/v0/blob/ad7ef987-a932-495c-aa0c-7ffcabeda45f/status 
   "id": "ad7ef987-a932-495c-aa0c-7ffcabeda45f",
   "replicas": [
     {
+      "id": 1,
       "provider": "f1234",
       "status": "active",
       "lastVerified": "2020-12-01T22:48:00Z",

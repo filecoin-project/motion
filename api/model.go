@@ -22,6 +22,7 @@ type (
 		Pieces   []Piece `json:"pieces"`
 	}
 	Piece struct {
+		Id           int64     `json:"id"`
 		Expiration   time.Time `json:"expiration"`
 		LastVerified time.Time `json:"lastVerified"`
 		PieceCID     string    `json:"pieceCid"`

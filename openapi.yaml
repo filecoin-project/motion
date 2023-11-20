@@ -112,6 +112,9 @@ paths:
                           items:
                             type: object
                             properties:
+                              id:
+                                type: integer
+                                description: 'Unique, opaque identifier for the replica.'
                               expiration:
                                 type: string
                                 format: date-time
@@ -133,7 +136,8 @@ paths:
                     replica:
                         provider: 'f0xxxx'
                         pieces: 
-                          - expiration: '2023-06-29T00:00:00Z'
+                          - id: 1
+                            expiration: '2023-06-29T00:00:00Z'
                             lastVerified: '2023-05-29T00:00:00Z'
                             pieceCid: 'baguqexxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
                             status: 'active'
