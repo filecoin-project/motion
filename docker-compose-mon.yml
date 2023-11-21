@@ -1,0 +1,151 @@
+version: "3"
+
+services:
+  db:
+    image: postgres:15
+    restart: always
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    environment:
+      POSTGRES_USER: ${SINGULARITY_DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${SINGULARITY_DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${SINGULARITY_DB_NAME:-singularity}
+    volumes:
+      - motion-singularity-volume:/var/lib/postgresql/data
+    ports:
+      - 5432:5432
+
+  singularity_admin_init:
+    image: ghcr.io/data-preservation-programs/singularity${SINGULARITY_REF}
+    command: admin init --identity Motion
+    volumes:
+      - motion-singularity-volume:/usr/src/app/storage
+    environment:
+      DATABASE_CONNECTION_STRING: postgres://${SINGULARITY_DB_USER:-postgres}:${SINGULARITY_DB_PASSWORD:-postgres}@db:5432/${SINGULARITY_DB_NAME:-singularity}
+      LOTUS_TEST:
+      LOTUS_API:
+      LOTUS_TOKEN:
+    depends_on:
+      db:
+        condition: service_healthy
+
+  singularity_api:
+    image: ghcr.io/data-preservation-programs/singularity${SINGULARITY_REF}
+    command: run api --bind :9090
+    volumes:
+      - motion-singularity-volume:/usr/src/app/storage
+    ports:
+      - 9090:9090
+    environment:
+      DATABASE_CONNECTION_STRING: postgres://${SINGULARITY_DB_USER:-postgres}:${SINGULARITY_DB_PASSWORD:-postgres}@db:5432/${SINGULARITY_DB_NAME:-singularity}
+      LOTUS_TEST:
+      LOTUS_API:
+      LOTUS_TOKEN:
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9090/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      singularity_admin_init:
+        condition: service_completed_successfully
+
+  singularity_dataset_worker:
+    image: ghcr.io/data-preservation-programs/singularity${SINGULARITY_REF}
+    volumes:
+      - motion-singularity-volume:/usr/src/app/storage
+    command: run dataset-worker
+    environment:
+      DATABASE_CONNECTION_STRING: postgres://${SINGULARITY_DB_USER:-postgres}:${SINGULARITY_DB_PASSWORD:-postgres}@db:5432/${SINGULARITY_DB_NAME:-singularity}
+      LOTUS_TEST:
+      LOTUS_API:
+      LOTUS_TOKEN:
+    depends_on:
+      singularity_admin_init:
+        condition: service_completed_successfully
+
+  singularity_deal_pusher:
+    image: ghcr.io/data-preservation-programs/singularity${SINGULARITY_REF}
+    volumes:
+      - motion-singularity-volume:/usr/src/app/storage
+    command: run deal-pusher
+    environment:
+      DATABASE_CONNECTION_STRING: postgres://${SINGULARITY_DB_USER:-postgres}:${SINGULARITY_DB_PASSWORD:-postgres}@db:5432/${SINGULARITY_DB_NAME:-singularity}
+      LOTUS_TEST:
+      LOTUS_API:
+      LOTUS_TOKEN:
+    depends_on:
+      singularity_admin_init:
+        condition: service_completed_successfully
+
+  singularity_deal_tracker:
+    image: ghcr.io/data-preservation-programs/singularity${SINGULARITY_REF}
+    volumes:
+      - motion-singularity-volume:/usr/src/app/storage
+    command: run deal-tracker
+    environment:
+      DATABASE_CONNECTION_STRING: postgres://${SINGULARITY_DB_USER:-postgres}:${SINGULARITY_DB_PASSWORD:-postgres}@db:5432/${SINGULARITY_DB_NAME:-singularity}
+      LOTUS_TEST:
+      LOTUS_API:
+      LOTUS_TOKEN:
+    depends_on:
+      singularity_admin_init:
+        condition: service_completed_successfully
+
+  singularity_content_provider:
+    image: ghcr.io/data-preservation-programs/singularity${SINGULARITY_REF}
+    command: run content-provider --http-bind :7778
+    volumes:
+      - motion-singularity-volume:/usr/src/app/storage
+    ports:
+      - 7778:7778
+    environment:
+      DATABASE_CONNECTION_STRING: postgres://${SINGULARITY_DB_USER:-postgres}:${SINGULARITY_DB_PASSWORD:-postgres}@db:5432/${SINGULARITY_DB_NAME:-singularity}
+      LOTUS_TEST:
+      LOTUS_API:
+      LOTUS_TOKEN:
+    depends_on:
+      singularity_admin_init:
+        condition: service_completed_successfully
+
+  motion:
+    image: ghcr.io/filecoin-project/motion:main
+    entrypoint: motion --experimentalSingularityStore --experimentalRemoteSingularityAPIUrl=singularity_api:9090 --experimentalSingularityContentURLTemplate=${SINGULARITY_CONTENT_PROVIDER_DOMAIN:-http://singularity_content_provider:7778}/piece/{PIECE_CID}
+    ports:
+      - 40080:40080
+    environment:
+      - MOTION_STORE_DIR=/usr/src/app/storage
+      - LOTUS_TEST
+      - LOTUS_API
+      - LOTUS_TOKEN
+      - MOTION_STORAGE_PROVIDERS
+      - MOTION_PRICE_PER_GIB_EPOCH
+      - MOTION_PRICE_PER_GIB
+      - MOTION_PRICE_PER_DEAL
+      - MOTION_DEAL_START_DELAY
+      - MOTION_DEAL_DURATION
+      - MOTION_SINGULARITY_MAX_CAR_SIZE
+      - MOTION_SINGULARITY_PACK_THRESHOLD
+      - MOTION_SINGULARITY_SCHEDULE_CRON
+      - MOTION_SINGULARITY_SCHEDULE_DEAL_NUMBER
+      - MOTION_WALLET_KEY
+      - MOTION_VERIFIED_DEAL
+    volumes:
+      - motion-singularity-volume:/usr/src/app/storage
+    depends_on:
+      singularity_api:
+        condition: service_healthy
+
+  dozzle:
+    container_name: dozzle
+    image: amir20/dozzle:latest
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - 9999:8080
+
+volumes:
+  motion-singularity-volume:
