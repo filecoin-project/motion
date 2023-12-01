@@ -118,6 +118,7 @@ services:
       - 40080:40080
     environment:
       - MOTION_STORE_DIR=/usr/src/app/storage
+      - MOTION_CONFIG_DIR=/usr/src/app/config
       - LOTUS_TEST
       - MOTION_STORAGE_PROVIDERS
       - MOTION_PRICE_PER_GIB_EPOCH
@@ -133,6 +134,7 @@ services:
       - MOTION_VERIFIED_DEAL
     volumes:
       - motion-singularity-volume:/usr/src/app/storage
+      - ./sps.yml:/usr/src/app/config/sps.yml
     depends_on:
       singularity_api:
         condition: service_healthy
