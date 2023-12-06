@@ -1,0 +1,47 @@
+# Default values for all SPs
+default:
+  # This is the domain/IP you will expose publicly to transfer data to storage providers
+  # When you initialize the singularity docker setup, it will start a server to deliver
+  # content to storage providers on localhost:7778. However, you will need to either
+  # open this specific port on your firewall, and set this value to http://~your-static-ip~:7778
+  # or you will need to setup reverse proxying from a dedicated web server like NGinx
+  # By default, this is set to empty string to send offline deals which requires SP to import manually.
+  content_provider_domain: ""
+  # Frequency (as a cron tab expression) with which motion should attempt to make
+  # new Filecoin deals. Defaults to every minute
+  schedule_cron: "* * * * *"
+  # Maximum number of deals motion should attempt to make when checking for new deals per cron trigger
+  schedule_deal_count: 1
+  # Specifies whether motion deals are made with FIL+ Data Cap allocation. In order to use this, you must apply for
+  # and receive a data cap allocation for your deals. In general, we recommend only those familiar with the Fil+
+  # application process use FIL+, and instead contract out of band with storage providers to make non verified (non Fil+)
+  # deals.
+  # Defaults to false
+  verified_deal: false
+  # ON-CHAIN price per gigabyte for motion deals
+  # In general, paid deals for motion should be negotiated in out of band contracts
+  # and there is no reason to change this value
+  price_per_gib_epoch: 0
+  # Another way to specify on-chain pricing for deals. There is no reason to change this value
+  price_per_gib: 0
+  # Another way to specify on-chain pricing for deals. There is no reason to change this value
+  price_per_deal: 0
+  # Maximum delay time in epoch or in duration format (e.g. 1000, 72h) between when a motion deal is proposed and when it's expected to be on chain.
+  # Defaults to 72 hours. In general, you should not change this unless your contract specifies something
+  # different.
+  deal_start_delay: 72h
+  # Initial total duration for motion deals stored on filecoin in epoch or in duration format (e.g. 1000, 72h).
+  # Defaults to 1 year. In general, you should not change this unless your contracts specify something different
+  deal_duration: 8760h
+# SP specific values to override the default value
+f0xxx:
+  content_provider_domain: http://~your-static-ip~:7778
+  schedule_cron: "* * * * *"
+  schedule_deal_count: 1
+f0yyy:
+  price_per_gib_epoch: 0
+  price_per_gib: 0
+  price_per_deal: 0
+  verified_deal: false
+  deal_start_delay: 72h
+  deal_duration: 8760h
