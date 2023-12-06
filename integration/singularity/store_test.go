@@ -51,8 +51,9 @@ func TestStorePut(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
 	s.Start(ctx)
+	defer cancel()
 
 	testFile := filepath.Join(tmpDir, "testdata.txt")
 	f, err := os.Create(testFile)

@@ -26,6 +26,10 @@ func main() {
 	if _, set := os.LookupEnv("GOLOG_LOG_LEVEL"); !set {
 		_ = log.SetLogLevel("*", "INFO")
 	}
+	pwd, err := os.Getwd()
+	if err != nil {
+		logger.Fatal(err)
+	}
 	app := cli.App{
 		Name:  "motion",
 		Usage: "Propelling data onto Filecoin",
@@ -36,6 +40,13 @@ func main() {
 				DefaultText: "OS Temporary directory",
 				Value:       os.TempDir(),
 				EnvVars:     []string{"MOTION_STORE_DIR"},
+			},
+			&cli.StringFlag{
+				Name:        "configDir",
+				Usage:       "The path at which to store Motion config, e.g. sps.yml",
+				DefaultText: "Current directory",
+				Value:       pwd,
+				EnvVars:     []string{"MOTION_CONFIG_DIR"},
 			},
 			&cli.Int64Flag{
 				Name:        "minFreeDiskSpace",
@@ -60,13 +71,6 @@ func main() {
 				DefaultText: "use singularity as a code library",
 				EnvVars:     []string{"MOTION_EXPERIMENTAL_REMOTE_SINGULARITY_API_URL"},
 			},
-			&cli.StringSliceFlag{
-				Name:        "storageProvider",
-				Aliases:     []string{"sp"},
-				Usage:       "Storage providers to which to make deals with. Multiple providers may be specified.",
-				DefaultText: "No deals are made to replicate data onto storage providers.",
-				EnvVars:     []string{"MOTION_STORAGE_PROVIDERS"},
-			},
 			&cli.BoolFlag{
 				Name:     "lotus-test",
 				Category: "Lotus",
@@ -76,35 +80,6 @@ func main() {
 				Name:        "replicationFactor",
 				Usage:       "The number of desired replicas per blob",
 				DefaultText: "Number of storage providers; see 'storageProvider' flag.",
-			},
-			&cli.Float64Flag{
-				Name:    "pricePerGiBEpoch",
-				Usage:   "The maximum price per GiB per Epoch in attoFIL.",
-				EnvVars: []string{"MOTION_PRICE_PER_GIB_EPOCH"},
-			},
-			&cli.Float64Flag{
-				Name:    "pricePerGiB",
-				Usage:   "The maximum  price per GiB in attoFIL.",
-				EnvVars: []string{"MOTION_PRICE_PER_GIB"},
-			},
-			&cli.Float64Flag{
-				Name:    "pricePerDeal",
-				Usage:   "The maximum price per deal in attoFIL.",
-				EnvVars: []string{"MOTION_PRICE_PER_DEAL"},
-			},
-			&cli.DurationFlag{
-				Name:        "dealStartDelay",
-				Usage:       "The deal start epoch delay.",
-				DefaultText: "72 hours",
-				Value:       72 * time.Hour,
-				EnvVars:     []string{"MOTION_DEAL_START_DELAY"},
-			},
-			&cli.DurationFlag{
-				Name:        "dealDuration",
-				Usage:       "The duration of deals made on Filecoin",
-				DefaultText: "One year (356 days)",
-				Value:       356 * 24 * time.Hour,
-				EnvVars:     []string{"MOTION_DEAL_DURATION"},
 			},
 			&cli.StringFlag{
 				Name:    "singularityMaxCarSize",
@@ -126,33 +101,6 @@ func main() {
 				Value:       24 * time.Hour,
 				EnvVars:     []string{"MOTION_SINGULARITY_FORCE_PACK_AFTER"},
 			},
-			&cli.BoolFlag{
-				Name:        "verifiedDeal",
-				Usage:       "whether deals made with motion should be verified deals",
-				DefaultText: "Deals are verified",
-				Value:       false,
-				EnvVars:     []string{"MOTION_VERIFIED_DEAL"},
-			},
-			&cli.StringFlag{
-				Name:        "experimentalSingularityContentURLTemplate",
-				Usage:       "When using a singularity as the storage engine, if set, setups up online deals to use the given url template for making online deals",
-				DefaultText: "make offline deals",
-				EnvVars:     []string{"MOTION_SINGULARITY_CONTENT_URL_TEMPLATE"},
-			},
-			&cli.StringFlag{
-				Name:        "experimentalSingularityScheduleCron",
-				Usage:       "When using a singularity as the storage engine, if set, setups up the cron schedule to send out batch deals.",
-				DefaultText: "runs every minute",
-				Value:       "* * * * *",
-				EnvVars:     []string{"MOTION_SINGULARITY_SCHEDULE_CRON"},
-			},
-			&cli.IntFlag{
-				Name:        "experimentalSingularityScheduleDealNumber",
-				Usage:       "When using a singularity as the storage engine, if set, setups up the max deal number per triggered schedule.",
-				DefaultText: "1 per trigger",
-				Value:       1,
-				EnvVars:     []string{"MOTION_SINGULARITY_SCHEDULE_DEAL_NUMBER"},
-			},
 			&cli.DurationFlag{
 				Name:    "experimentalSingularityCleanupInterval",
 				Usage:   "How often to check for and delete files from the local store that have already had deals made",
@@ -168,6 +116,7 @@ func main() {
 				address.CurrentNetwork = address.Mainnet
 			}
 			storeDir := cctx.String("storeDir")
+			configDir := cctx.String("configDir")
 			var store blob.Store
 			if cctx.Bool("experimentalSingularityStore") {
 				singularityAPIUrl := cctx.String("experimentalRemoteSingularityAPIUrl")
@@ -182,34 +131,14 @@ func main() {
 					return fmt.Errorf("singularity API URL is required")
 				}
 
-				// Parse any configured storage provider addresses.
-				sps := cctx.StringSlice("storageProvider")
-				spAddrs := make([]address.Address, 0, len(sps))
-				for _, sp := range sps {
-					spAddr, err := address.NewFromString(sp)
-					if err != nil {
-						return fmt.Errorf("storage provider '%s' is not a valid address: %w", sp, err)
-					}
-					spAddrs = append(spAddrs, spAddr)
-				}
 				singularityStore, err := singularity.NewStore(
-					singularity.WithStoreDir(cctx.String("storeDir")),
-					singularity.WithStorageProviders(spAddrs...),
-					singularity.WithReplicationFactor(cctx.Uint("replicationFactor")),
-					singularity.WithPricePerGiBEpoch(attoFilToTokenAmount(cctx.Float64("pricePerGiBEpoch"))),
-					singularity.WithPricePerGiB(attoFilToTokenAmount(cctx.Float64("pricePerGiB"))),
-					singularity.WithPricePerDeal(attoFilToTokenAmount(cctx.Float64("pricePerDeal"))),
-					singularity.WithDealStartDelay(durationToFilecoinEpoch(cctx.Duration("dealStartDelay"))),
-					singularity.WithDealDuration(durationToFilecoinEpoch(cctx.Duration("dealDuration"))),
+					singularity.WithStoreDir(storeDir),
+					singularity.WithConfigDir(configDir),
 					singularity.WithSingularityClient(singClient),
 					singularity.WithWalletKey(cctx.String("walletKey")),
 					singularity.WithMaxCarSize(cctx.String("singularityMaxCarSize")),
 					singularity.WithPackThreshold(cctx.Int64("singularityPackThreshold")),
 					singularity.WithForcePackAfter(cctx.Duration("singularityForcePackAfter")),
-					singularity.WithScheduleUrlTemplate(cctx.String("experimentalSingularityContentURLTemplate")),
-					singularity.WithScheduleCron(cctx.String("experimentalSingularityScheduleCron")),
-					singularity.WithScheduleDealNumber(cctx.Int("experimentalSingularityScheduleDealNumber")),
-					singularity.WithVerifiedDeal(cctx.Bool("verifiedDeal")),
 					singularity.WithCleanupInterval(cctx.Duration("experimentalSingularityCleanupInterval")),
 					singularity.WithMinFreeSpace(cctx.Int64("minFreeDiskSpace")),
 				)

@@ -5,10 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math/big"
 	"net/http"
+	"os"
 	"path"
-	"strconv"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -23,11 +23,11 @@ import (
 	"github.com/data-preservation-programs/singularity/client/swagger/http/wallet_association"
 	"github.com/data-preservation-programs/singularity/client/swagger/models"
 	"github.com/data-preservation-programs/singularity/service/epochutil"
-	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/go-state-types/builtin"
 	"github.com/filecoin-project/motion/blob"
 	"github.com/gotidy/ptr"
 	"github.com/ipfs/go-log/v2"
+	"golang.org/x/exp/slices"
+	"gopkg.in/yaml.v3"
 )
 
 var logger = log.Logger("motion/integration/singularity")
@@ -42,6 +42,61 @@ type Store struct {
 	closing          chan struct{}
 	closed           sync.WaitGroup
 	forcePack        *time.Ticker
+	spConfig         map[string]ProviderConfig
+}
+
+type ProviderConfig struct {
+	ContentProviderDomain *string  `yaml:"content_provider_domain"`
+	ScheduleCron          *string  `yaml:"schedule_cron"`
+	ScheduleDealCount     *int64   `yaml:"schedule_deal_count"`
+	VerifiedDeal          *bool    `yaml:"verified_deal"`
+	PricePerGibEpoch      *float64 `yaml:"price_per_gib_epoch"`
+	PricePerGib           *float64 `yaml:"price_per_gib"`
+	PricePerDeal          *float64 `yaml:"price_per_deal"`
+	DealStartDelay        *string  `yaml:"deal_start_delay"`
+	DealDuration          *string  `yaml:"deal_duration"`
+}
+
+func (c *ProviderConfig) applyDefault(def ProviderConfig) {
+	if c.ContentProviderDomain == nil {
+		c.ContentProviderDomain = def.ContentProviderDomain
+	}
+	if c.ScheduleCron == nil {
+		c.ScheduleCron = def.ScheduleCron
+	}
+	if c.VerifiedDeal == nil {
+		c.VerifiedDeal = def.VerifiedDeal
+	}
+	if c.PricePerGibEpoch == nil {
+		c.PricePerGibEpoch = def.PricePerGibEpoch
+	}
+	if c.PricePerGib == nil {
+		c.PricePerGib = def.PricePerGib
+	}
+	if c.PricePerDeal == nil {
+		c.PricePerDeal = def.PricePerDeal
+	}
+	if c.DealStartDelay == nil {
+		c.DealStartDelay = def.DealStartDelay
+	}
+	if c.DealDuration == nil {
+		c.DealDuration = def.DealDuration
+	}
+	if c.ScheduleDealCount == nil {
+		c.ScheduleDealCount = def.ScheduleDealCount
+	}
+}
+
+var defaultProviderConfig = ProviderConfig{
+	ContentProviderDomain: ptr.Of(""),
+	ScheduleCron:          ptr.Of("* * * * *"),
+	VerifiedDeal:          ptr.Of(false),
+	PricePerGibEpoch:      ptr.Of(0.0),
+	PricePerGib:           ptr.Of(0.0),
+	PricePerDeal:          ptr.Of(0.0),
+	DealStartDelay:        ptr.Of("72h"),
+	DealDuration:          ptr.Of("8760h"),
+	ScheduleDealCount:     ptr.Of(int64(1)),
 }
 
 func NewStore(o ...Option) (*Store, error) {
@@ -99,6 +154,110 @@ func (s *Store) initPreparation(ctx context.Context) (*models.ModelPreparation, 
 	logger.Infow("Created preparation", "id", createPreparationRes.Payload.ID)
 
 	return createPreparationRes.Payload, nil
+}
+
+func (s *Store) processSPConfig(ctx context.Context) error {
+	logger.Info("Processing SP config from config dir")
+	configStr, err := os.ReadFile(filepath.Join(s.configDir, "sps.yml"))
+	if err != nil {
+		logger.Errorw("Failed to read SP config. Expect sps.yml in config dir.", "err", err)
+	}
+
+	configMap := make(map[string]ProviderConfig)
+	err = yaml.Unmarshal(configStr, &configMap)
+	if err != nil {
+		return fmt.Errorf("failed to parse SP config: %w", err)
+	}
+
+	newConfig := make(map[string]ProviderConfig)
+
+	def, ok := configMap["default"]
+	if ok {
+		def.applyDefault(defaultProviderConfig)
+	} else {
+		def = defaultProviderConfig
+	}
+	for sp, cfg := range configMap {
+		if sp != "default" {
+			cfg.applyDefault(def)
+			newConfig[sp] = cfg
+		}
+	}
+	s.spConfig = newConfig
+	return s.applySPConfigChange(ctx)
+}
+
+func (s *Store) applySPConfigChange(ctx context.Context) error {
+	schedules, err := s.singularityClient.DealSchedule.ListPreparationSchedules(&deal_schedule.ListPreparationSchedulesParams{
+		Context: ctx,
+		ID:      s.preparationName,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to list schedules for preparation: %w", err)
+	}
+	// Delete all schedules that are not in the new config
+	for _, schd := range schedules.Payload {
+		if _, ok := s.spConfig[schd.Provider]; !ok {
+			logger.Infow("Deleting schedule", "provider", schd.Provider)
+			_, err := s.singularityClient.DealSchedule.RemoveSchedule(&deal_schedule.RemoveScheduleParams{
+				Context: ctx,
+				ID:      schd.ID,
+			})
+			if err != nil {
+				return fmt.Errorf("failed to delete schedule for provider: %w", err)
+			}
+		}
+	}
+	// Create new schedules for new providers in the new config, or update schedules for existing providers
+	for sp, cfg := range s.spConfig {
+		found := slices.IndexFunc(schedules.Payload, func(s *models.ModelSchedule) bool {
+			return s.Provider == sp
+		})
+		if found == -1 {
+			logger.Infow("Creating schedule", "provider", sp)
+			_, err := s.singularityClient.DealSchedule.CreateSchedule(&deal_schedule.CreateScheduleParams{
+				Schedule: &models.ScheduleCreateRequest{
+					Duration:           cfg.DealDuration,
+					Preparation:        s.preparationName,
+					PricePerDeal:       *cfg.PricePerDeal,
+					PricePerGb:         *cfg.PricePerGib,
+					PricePerGbEpoch:    *cfg.PricePerGibEpoch,
+					Provider:           sp,
+					ScheduleCron:       *cfg.ScheduleCron,
+					StartDelay:         cfg.DealStartDelay,
+					URLTemplate:        *cfg.ContentProviderDomain,
+					Verified:           cfg.VerifiedDeal,
+					ScheduleDealNumber: *cfg.ScheduleDealCount,
+				},
+				Context: ctx,
+			})
+			if err != nil {
+				return fmt.Errorf("failed to create schedule for provider: %w", err)
+			}
+		} else {
+			logger.Infow("Updating schedule", "provider", sp)
+			current := schedules.Payload[found]
+			_, err := s.singularityClient.DealSchedule.UpdateSchedule(&deal_schedule.UpdateScheduleParams{
+				Body: &models.ScheduleUpdateRequest{
+					Duration:           cfg.DealDuration,
+					PricePerDeal:       *cfg.PricePerDeal,
+					PricePerGb:         *cfg.PricePerGib,
+					PricePerGbEpoch:    *cfg.PricePerGibEpoch,
+					ScheduleCron:       *cfg.ScheduleCron,
+					StartDelay:         cfg.DealStartDelay,
+					URLTemplate:        *cfg.ContentProviderDomain,
+					Verified:           cfg.VerifiedDeal,
+					ScheduleDealNumber: *cfg.ScheduleDealCount,
+				},
+				ID:      current.ID,
+				Context: ctx,
+			})
+			if err != nil {
+				return fmt.Errorf("failed to update schedule for provider: %w", err)
+			}
+		}
+	}
+	return nil
 }
 
 func (s *Store) Start(ctx context.Context) error {
@@ -196,100 +355,21 @@ func (s *Store) Start(ctx context.Context) error {
 			logger.Infow("Successfully added wallet to preparation", "id", attachWalletRes.Payload.ID)
 		}
 	}
-	// Ensure schedules are created
-	// TODO: handle config changes for replication -- singularity currently has no modify schedule endpoint
-	listPreparationSchedulesRes, err := s.singularityClient.DealSchedule.ListPreparationSchedules(&deal_schedule.ListPreparationSchedulesParams{
-		Context: ctx,
-		ID:      s.preparationName,
-	})
 
-	switch {
-	case err == nil:
-		logger.Infow("Found existing schedules for preparation", "count", len(listPreparationSchedulesRes.Payload))
-	case strings.Contains(err.Error(), "404"):
-		logger.Info("Found no schedules for preparation")
-	default:
-		return fmt.Errorf("failed to list schedules for preparation: %w", err)
-	}
-
-	pricePerGBEpoch, _ := (new(big.Rat).SetFrac(s.pricePerGiBEpoch.Int, big.NewInt(int64(1e18)))).Float64()
-	pricePerGB, _ := (new(big.Rat).SetFrac(s.pricePerGiB.Int, big.NewInt(int64(1e18)))).Float64()
-	pricePerDeal, _ := (new(big.Rat).SetFrac(s.pricePerDeal.Int, big.NewInt(int64(1e18)))).Float64()
-
-	logger.Infof("Checking %v storage providers", len(s.storageProviders))
-	for _, sp := range s.storageProviders {
-		logger.Infof("Checking storage provider %s", sp)
-		var foundSchedule *models.ModelSchedule
-		logger := logger.With("provider", sp)
-		for _, schd := range listPreparationSchedulesRes.Payload {
-			scheduleAddr, err := address.NewFromString(schd.Provider)
-			if err == nil && sp == scheduleAddr {
-				foundSchedule = schd
-				break
-			}
-		}
-		if foundSchedule != nil {
-			// If schedule was found, update it
-			logger.Infow("Schedule found for provider. Updating with latest settings", "id", foundSchedule.ID)
-			_, err := s.singularityClient.DealSchedule.UpdateSchedule(&deal_schedule.UpdateScheduleParams{
-				Context: ctx,
-				ID:      foundSchedule.ID,
-				Body: &models.ScheduleUpdateRequest{
-					PricePerGbEpoch:       pricePerGBEpoch,
-					PricePerGb:            pricePerGB,
-					PricePerDeal:          pricePerDeal,
-					Verified:              &s.verifiedDeal,
-					Ipni:                  &s.ipniAnnounce,
-					KeepUnsealed:          &s.keepUnsealed,
-					StartDelay:            ptr.String(strconv.Itoa(int(s.dealStartDelay)*builtin.EpochDurationSeconds) + "s"),
-					Duration:              ptr.String(strconv.Itoa(int(s.dealDuration)*builtin.EpochDurationSeconds) + "s"),
-					ScheduleCron:          s.scheduleCron,
-					ScheduleCronPerpetual: s.scheduleCronPerpetual,
-					ScheduleDealNumber:    int64(s.scheduleDealNumber),
-					TotalDealNumber:       int64(s.totalDealNumber),
-					ScheduleDealSize:      s.scheduleDealSize,
-					TotalDealSize:         s.totalDealSize,
-					MaxPendingDealSize:    s.maxPendingDealSize,
-					MaxPendingDealNumber:  int64(s.maxPendingDealNumber),
-					URLTemplate:           s.scheduleUrlTemplate,
-				},
-			})
+	// Start a goroutine to periodically check for SP config changes
+	go func() {
+		for {
+			err = s.processSPConfig(ctx)
 			if err != nil {
-				return fmt.Errorf("failed to update schedule for provider: %w", err)
+				logger.Errorw("Failed to process SP config", "err", err)
 			}
-		} else {
-			// Otherwise, create it
-			logger.Info("Schedule not found for provider. Creating schedule")
-			if createScheduleRes, err := s.singularityClient.DealSchedule.CreateSchedule(&deal_schedule.CreateScheduleParams{
-				Context: ctx,
-				Schedule: &models.ScheduleCreateRequest{
-					Preparation:           s.preparationName,
-					Provider:              sp.String(),
-					PricePerGbEpoch:       pricePerGBEpoch,
-					PricePerGb:            pricePerGB,
-					PricePerDeal:          pricePerDeal,
-					Verified:              &s.verifiedDeal,
-					Ipni:                  &s.ipniAnnounce,
-					KeepUnsealed:          &s.keepUnsealed,
-					StartDelay:            ptr.String(strconv.Itoa(int(s.dealStartDelay)*builtin.EpochDurationSeconds) + "s"),
-					Duration:              ptr.String(strconv.Itoa(int(s.dealDuration)*builtin.EpochDurationSeconds) + "s"),
-					ScheduleCron:          s.scheduleCron,
-					ScheduleCronPerpetual: s.scheduleCronPerpetual,
-					ScheduleDealNumber:    int64(s.scheduleDealNumber),
-					TotalDealNumber:       int64(s.totalDealNumber),
-					ScheduleDealSize:      s.scheduleDealSize,
-					TotalDealSize:         s.totalDealSize,
-					MaxPendingDealSize:    s.maxPendingDealSize,
-					MaxPendingDealNumber:  int64(s.maxPendingDealNumber),
-					URLTemplate:           s.scheduleUrlTemplate,
-				},
-			}); err != nil {
-				return fmt.Errorf("failed to create schedule for provider: %w", err)
-			} else {
-				logger.Infow("Successfully created schedule for provider", "id", createScheduleRes.Payload.ID)
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(10 * time.Second):
 			}
 		}
-	}
+	}()
 
 	s.cleanupScheduler.start(ctx)
 
@@ -552,11 +632,11 @@ func (s *Store) hasDealForAllProviders(ctx context.Context, blobID blob.ID) (boo
 	}
 
 	// Make sure the file has at least 1 deal for every SP
-	for _, sp := range s.storageProviders {
+	for sp, _ := range s.spConfig {
 		foundDealForSP := false
 		for _, deal := range getFileDealsRes.Payload {
 			// Only check state for current provider
-			if deal.Provider != sp.String() {
+			if deal.Provider != sp {
 				continue
 			}
 

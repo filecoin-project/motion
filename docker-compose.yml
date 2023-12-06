@@ -113,26 +113,19 @@ services:
 
   motion:
     image: ghcr.io/filecoin-project/motion:main
-    entrypoint: motion --experimentalSingularityStore --experimentalRemoteSingularityAPIUrl=singularity_api:9090 --experimentalSingularityContentURLTemplate=${SINGULARITY_CONTENT_PROVIDER_DOMAIN:-http://singularity_content_provider:7778}/piece/{PIECE_CID}
+    entrypoint: motion --experimentalSingularityStore --experimentalRemoteSingularityAPIUrl=singularity_api:9090
     ports:
       - 40080:40080
     environment:
       - MOTION_STORE_DIR=/usr/src/app/storage
+      - MOTION_CONFIG_DIR=/usr/src/app/config
       - LOTUS_TEST
-      - MOTION_STORAGE_PROVIDERS
-      - MOTION_PRICE_PER_GIB_EPOCH
-      - MOTION_PRICE_PER_GIB
-      - MOTION_PRICE_PER_DEAL
-      - MOTION_DEAL_START_DELAY
-      - MOTION_DEAL_DURATION
       - MOTION_SINGULARITY_MAX_CAR_SIZE
       - MOTION_SINGULARITY_PACK_THRESHOLD
-      - MOTION_SINGULARITY_SCHEDULE_CRON
-      - MOTION_SINGULARITY_SCHEDULE_DEAL_NUMBER
       - MOTION_WALLET_KEY
-      - MOTION_VERIFIED_DEAL
     volumes:
       - motion-singularity-volume:/usr/src/app/storage
+      - ./sps.yml:/usr/src/app/config/sps.yml
     depends_on:
       singularity_api:
         condition: service_healthy
