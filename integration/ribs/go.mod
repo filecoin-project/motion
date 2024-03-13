@@ -1,6 +1,6 @@
 module github.com/filecoin-project/motion/integration/ribs
 
-go 1.20
+go 1.21
 
 require (
 	github.com/filecoin-project/lotus v1.23.4-rc2
