@@ -1,6 +1,6 @@
 module github.com/filecoin-project/motion
 
-go 1.20
+go 1.21
 
 require (
 	github.com/data-preservation-programs/singularity v0.5.9
