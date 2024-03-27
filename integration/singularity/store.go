@@ -522,6 +522,7 @@ func (s *Store) Describe(ctx context.Context, id blob.ID) (*blob.Descriptor, err
 			updatedAt = time.Time{}
 		}
 		piece := blob.Piece{
+			Id:          deal.ID,
 			Expiration:  epochutil.EpochToTime(int32(deal.EndEpoch)),
 			LastUpdated: updatedAt,
 			PieceCID:    deal.PieceCid,
